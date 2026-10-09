@@ -38,7 +38,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
         </div>
 
         <div class="sidebar-footer">
-          <div class="footer-text">SmartRoster v1.0</div>
+          <div class="footer-text">Created by DC</div>
         </div>
       </nav>
 
