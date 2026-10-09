@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
-import { Roster, GenerateRosterRequest, UpdateAssignmentsRequest } from '../models/models';
+import { Roster, GenerateRosterRequest, UpdateAssignmentsRequest, ContinuityContext } from '../models/models';
 import { environment } from '../../environments/environment';
 
 @Injectable({
@@ -22,6 +22,12 @@ export class RosterService {
 
   getRosterByMonth(month: number, year: number): Observable<Roster> {
     return this.http.get<Roster>(`${this.apiUrl}/by-month`, {
+      params: { month: month.toString(), year: year.toString() }
+    });
+  }
+
+  getContinuityContext(month: number, year: number): Observable<ContinuityContext> {
+    return this.http.get<ContinuityContext>(`${this.apiUrl}/continuity-context`, {
       params: { month: month.toString(), year: year.toString() }
     });
   }

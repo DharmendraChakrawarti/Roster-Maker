@@ -11,21 +11,21 @@ import { Employee } from '../../models/models';
   template: `
     <div class="page-container">
       <div class="page-header">
-        <h1>👥 Manage Employees</h1>
+        <h1>Manage Employees</h1>
         <div class="page-actions">
-          <button class="btn btn-secondary" (click)="showImportModal = true">📁 Import File</button>
-          <button class="btn btn-primary" (click)="showBulkModal = true">➕ Add Employees</button>
+          <button class="btn btn-secondary" (click)="showImportModal = true">Import File</button>
+          <button class="btn btn-primary" (click)="showBulkModal = true">Add Employees</button>
         </div>
       </div>
 
       <!-- Alerts -->
       <div *ngIf="successMessage" class="alert alert-success">
-        ✅ {{ successMessage }}
-        <button class="btn btn-sm" style="margin-left:auto; background:none; color:inherit" (click)="successMessage = ''">✕</button>
+        {{ successMessage }}
+        <button class="btn btn-sm" style="margin-left:auto; background:none; color:inherit; text-transform:none" (click)="successMessage = ''">Dismiss</button>
       </div>
       <div *ngIf="errorMessage" class="alert alert-danger">
-        ❌ {{ errorMessage }}
-        <button class="btn btn-sm" style="margin-left:auto; background:none; color:inherit" (click)="errorMessage = ''">✕</button>
+        {{ errorMessage }}
+        <button class="btn btn-sm" style="margin-left:auto; background:none; color:inherit; text-transform:none" (click)="errorMessage = ''">Dismiss</button>
       </div>
 
       <!-- Employee List -->
@@ -33,7 +33,7 @@ import { Employee } from '../../models/models';
         <div class="card-header">
           <h3>Active Employees ({{ employees.length }})</h3>
           <div class="flex gap-1 items-center">
-            <input type="text" class="form-control search-input" placeholder="🔍 Search..."
+            <input type="text" class="form-control search-input" placeholder="Search employees..."
                    [(ngModel)]="searchTerm" (input)="filterEmployees()">
           </div>
         </div>
@@ -44,9 +44,11 @@ import { Employee } from '../../models/models';
         </div>
 
         <div *ngIf="!loading && filteredEmployees.length === 0" class="empty-state">
-          <div class="icon">👥</div>
+          <div class="icon">
+            <svg class="icon-svg icon-xl" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
           <p>No employees found. Add employees to get started.</p>
-          <button class="btn btn-primary" (click)="showBulkModal = true">➕ Add Employees</button>
+          <button class="btn btn-primary" (click)="showBulkModal = true">Add Employees</button>
         </div>
 
         <table class="data-table" *ngIf="!loading && filteredEmployees.length > 0">
@@ -73,13 +75,13 @@ import { Employee } from '../../models/models';
               <td>
                 <div class="flex gap-1">
                   <button *ngIf="editingId !== emp.id" class="btn btn-sm btn-secondary"
-                          (click)="startEdit(emp)">✏️ Edit</button>
+                          (click)="startEdit(emp)">Edit</button>
                   <button *ngIf="editingId === emp.id" class="btn btn-sm btn-success"
-                          (click)="saveEdit(emp)">💾 Save</button>
+                          (click)="saveEdit(emp)">Save</button>
                   <button *ngIf="editingId === emp.id" class="btn btn-sm btn-secondary"
                           (click)="cancelEdit()">Cancel</button>
                   <button *ngIf="editingId !== emp.id" class="btn btn-sm btn-danger"
-                          (click)="confirmDelete(emp)">🗑️</button>
+                          (click)="confirmDelete(emp)">Remove</button>
                 </div>
               </td>
             </tr>
@@ -90,8 +92,8 @@ import { Employee } from '../../models/models';
       <!-- Bulk Add Modal -->
       <div class="modal-backdrop" *ngIf="showBulkModal" (click)="showBulkModal = false">
         <div class="modal-content" (click)="$event.stopPropagation()">
-          <h2 style="margin-bottom: 1rem;">➕ Add Employees</h2>
-          <p class="text-muted mb-2">Enter employee names, one per line:</p>
+          <h2 style="margin-bottom: 1rem;">Add Employees</h2>
+          <p class="text-muted mb-2" style="font-size:0.85rem">Enter employee names, one per line:</p>
           <div class="form-group">
             <textarea class="form-control" rows="10" [(ngModel)]="bulkNames"
                       placeholder="Rahul Sharma&#10;Priya Patel&#10;Amit Kumar"></textarea>
@@ -108,8 +110,8 @@ import { Employee } from '../../models/models';
       <!-- Import Modal -->
       <div class="modal-backdrop" *ngIf="showImportModal" (click)="showImportModal = false">
         <div class="modal-content" (click)="$event.stopPropagation()">
-          <h2 style="margin-bottom: 1rem;">📁 Import from File</h2>
-          <p class="text-muted mb-2">Upload a CSV or Excel file with employee names in the first column.</p>
+          <h2 style="margin-bottom: 1rem;">Import from File</h2>
+          <p class="text-muted mb-2" style="font-size:0.85rem">Upload a CSV or Excel file with employee names in the first column.</p>
           <div class="form-group">
             <input type="file" class="form-control" accept=".csv,.xlsx,.xls,.txt"
                    (change)="onFileSelected($event)" id="importFile">
@@ -126,9 +128,9 @@ import { Employee } from '../../models/models';
       <!-- Delete Confirm Modal -->
       <div class="modal-backdrop" *ngIf="deleteTarget" (click)="deleteTarget = null">
         <div class="modal-content" (click)="$event.stopPropagation()">
-          <h2 style="margin-bottom: 1rem;">🗑️ Remove Employee</h2>
+          <h2 style="margin-bottom: 1rem;">Remove Employee</h2>
           <p>Are you sure you want to remove <strong>{{ deleteTarget.name }}</strong>?</p>
-          <p class="text-muted mt-1">This will deactivate the employee, not permanently delete them.</p>
+          <p class="text-muted mt-1" style="font-size:0.85rem">This will deactivate the employee, not permanently delete them.</p>
           <div class="flex gap-1 mt-2" style="justify-content: flex-end;">
             <button class="btn btn-secondary" (click)="deleteTarget = null">Cancel</button>
             <button class="btn btn-danger" (click)="deleteEmployee()">Remove</button>

@@ -60,3 +60,27 @@ export interface AssignmentUpdate {
 export interface UpdateAssignmentsRequest {
   updates: AssignmentUpdate[];
 }
+
+export interface HistoricalMonthSummary {
+  month: number;
+  year: number;
+  monthName: string;
+  status: string;
+  assignmentCount: number;
+}
+
+export interface ContinuityContext {
+  targetMonth: number;
+  targetYear: number;
+  targetMonthName: string;
+  immediatePreviousAvailable: boolean;
+  immediatePreviousMonth?: number;
+  immediatePreviousYear?: number;
+  immediatePreviousMonthName?: string;
+  totalHistoricalMonths: number;
+  historicalMonths: HistoricalMonthSummary[];
+  activeEmployeesCount: number;
+  statusMessage: string;
+  readyToGenerate: boolean;
+  auditDetails: string[];
+}

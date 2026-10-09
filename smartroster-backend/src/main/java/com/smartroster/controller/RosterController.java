@@ -1,5 +1,6 @@
 package com.smartroster.controller;
 
+import com.smartroster.dto.ContinuityContextDTO;
 import com.smartroster.dto.GenerateRosterRequest;
 import com.smartroster.dto.RosterDTO;
 import com.smartroster.dto.UpdateAssignmentsRequest;
@@ -40,6 +41,11 @@ public class RosterController {
     @GetMapping("/by-month")
     public ResponseEntity<RosterDTO> getRosterByMonth(@RequestParam int month, @RequestParam int year) {
         return ResponseEntity.ok(rosterService.getRosterByMonthYear(month, year));
+    }
+
+    @GetMapping("/continuity-context")
+    public ResponseEntity<ContinuityContextDTO> getContinuityContext(@RequestParam int month, @RequestParam int year) {
+        return ResponseEntity.ok(rosterService.getContinuityContext(month, year));
     }
 
     @PostMapping("/generate")

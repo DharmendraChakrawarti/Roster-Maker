@@ -13,6 +13,8 @@ public interface RosterAssignmentRepository extends JpaRepository<RosterAssignme
 
     List<RosterAssignment> findByRosterId(Long rosterId);
 
+    long countByRosterId(Long rosterId);
+
     @Query("SELECT ra FROM RosterAssignment ra JOIN FETCH ra.employee WHERE ra.roster.id = :rosterId ORDER BY ra.employee.name, ra.assignmentDate")
     List<RosterAssignment> findByRosterIdWithEmployee(@Param("rosterId") Long rosterId);
 

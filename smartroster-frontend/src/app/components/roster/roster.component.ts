@@ -10,7 +10,8 @@ import {
   ShiftConfig,
   Employee,
   GenerateRosterRequest,
-  AssignmentUpdate
+  AssignmentUpdate,
+  ContinuityContext
 } from '../../models/models';
 
 interface DayColumn {
@@ -22,12 +23,6 @@ interface DayColumn {
   isSaturday: boolean;
 }
 
-interface ShiftSummaryItem {
-  shiftName: string;
-  colorCode: string;
-  count: number;
-}
-
 @Component({
   selector: 'app-roster',
   standalone: true,
@@ -36,35 +31,43 @@ interface ShiftSummaryItem {
     <div class="page-container">
       <div class="page-header">
         <div>
-          <h1><span>📅</span> Shift Roster Management</h1>
-          <p class="text-muted">Generate, customize, and analyze monthly shift rosters with automated fairness</p>
+          <h1>Shift Roster Management</h1>
+          <p class="text-secondary subtitle">Generate, customize, and analyze monthly shift rosters with automated fairness rules</p>
         </div>
         <div class="page-actions">
-          <button class="btn btn-secondary" (click)="loadAllRosters()">
-            <span>🔄</span> Refresh
+          <button class="btn btn-secondary" (click)="loadAllRosters()" title="Refresh Roster Data">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            Refresh
           </button>
           <button *ngIf="currentRoster && currentRoster.id" class="btn btn-success" (click)="exportExcel()" [disabled]="loading">
-            <span>📥</span> Export Excel
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+            Export Excel
           </button>
           <button *ngIf="currentRoster && currentRoster.id && currentRoster.status !== 'FINALIZED'" class="btn btn-accent" (click)="finalizeCurrentRoster()" [disabled]="loading">
-            <span>🔒</span> Finalize Roster
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            Finalize Roster
           </button>
           <button *ngIf="currentRoster && currentRoster.id" class="btn btn-danger" (click)="deleteCurrentRoster()" [disabled]="loading">
-            <span>🗑️</span> Remove Roster
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            Delete
           </button>
         </div>
       </div>
 
       <!-- Alerts -->
       <div *ngIf="successMessage" class="alert alert-success">
-        <span>✓</span> {{ successMessage }}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        <span>{{ successMessage }}</span>
+        <button class="alert-close-btn" (click)="clearMessages()">✕</button>
       </div>
       <div *ngIf="errorMessage" class="alert alert-danger">
-        <span>⚠️</span> {{ errorMessage }}
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+        <span>{{ errorMessage }}</span>
+        <button class="alert-close-btn" (click)="clearMessages()">✕</button>
       </div>
 
-      <!-- Generation / Controls Card -->
-      <div class="card mb-3">
+      <!-- Controls Panel -->
+      <div class="card mb-3 controls-card">
         <div class="roster-controls">
           <div class="control-group">
             <label class="control-label">Month</label>
@@ -81,36 +84,38 @@ interface ShiftSummaryItem {
           </div>
 
           <div class="control-group">
-            <label class="control-label">Weekly Off Days</label>
+            <label class="control-label">Weekly Rest Days</label>
             <select class="form-control select-control" [(ngModel)]="weeklyOffPerEmployee">
               <option [ngValue]="2">2 Days / Week</option>
               <option [ngValue]="1">1 Day / Week</option>
             </select>
           </div>
 
-          <div class="control-group">
-            <label class="control-label">Quick Actions</label>
+          <div class="control-group quick-actions-group">
+            <label class="control-label">Operations</label>
             <div class="quick-btns">
               <button class="btn btn-primary" (click)="generateRoster()" [disabled]="loading">
-                <span *ngIf="!loading">⚡ Generate Roster</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                <span *ngIf="!loading">Generate Roster</span>
                 <span *ngIf="loading">Generating...</span>
               </button>
               <button class="btn btn-secondary" (click)="loadRosterForMonth(selectedMonth, selectedYear)" [disabled]="loading">
-                <span>🔍 Load Saved</span>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                Load Saved
               </button>
             </div>
           </div>
 
-          <!-- Existing Rosters Quick Select -->
+          <!-- Saved Rosters List -->
           <div class="control-group saved-rosters" *ngIf="allRosters.length > 0">
-            <label class="control-label">Saved Rosters ({{ allRosters.length }})</label>
+            <label class="control-label">Available Rosters ({{ allRosters.length }})</label>
             <div class="roster-pills">
               <button
                 *ngFor="let r of allRosters"
                 class="roster-pill"
                 [class.active]="currentRoster && currentRoster.id === r.id"
                 (click)="selectRoster(r)">
-                {{ getMonthName(r.month) }} {{ r.year }}
+                <span>{{ getMonthName(r.month) }} {{ r.year }}</span>
                 <span class="pill-badge" [class.badge-final]="r.status === 'FINALIZED'">
                   {{ r.status }}
                 </span>
@@ -120,60 +125,128 @@ interface ShiftSummaryItem {
         </div>
       </div>
 
-      <!-- Warnings Banner if any -->
+      <!-- Pre-Generation Historical Continuity & Cadence Inspection Panel -->
+      <div *ngIf="continuityContext" class="card mb-3 continuity-card">
+        <div class="continuity-header">
+          <div class="continuity-title">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            <strong>Historical Continuity & Cadence Inspection</strong>
+            <span class="badge badge-target">{{ continuityContext.targetMonthName }}</span>
+          </div>
+          <div class="continuity-status-badges">
+            <span *ngIf="continuityContext.immediatePreviousAvailable" class="status-badge status-success">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Linked: {{ continuityContext.immediatePreviousMonthName }}
+            </span>
+            <span *ngIf="!continuityContext.immediatePreviousAvailable && continuityContext.totalHistoricalMonths > 0" class="status-badge status-warning">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              {{ continuityContext.immediatePreviousMonthName }} Missing
+            </span>
+            <span class="status-badge status-invariant">
+              Strict 5-Day Work Limit (Zero 6-Day Fatigue Weeks)
+            </span>
+          </div>
+        </div>
+
+        <div class="continuity-body">
+          <p class="continuity-summary-msg">{{ continuityContext.statusMessage }}</p>
+
+          <!-- Historical Months Found Pills -->
+          <div class="historical-pills-row" *ngIf="continuityContext.historicalMonths.length > 0">
+            <span class="hist-label">Inspected Previous Months:</span>
+            <div class="hist-pills">
+              <span *ngFor="let hm of continuityContext.historicalMonths" class="hist-pill">
+                {{ hm.monthName }}
+                <small class="hist-count">({{ hm.assignmentCount }} shifts)</small>
+              </span>
+            </div>
+          </div>
+
+          <!-- Audit details list -->
+          <div class="audit-details-list">
+            <div *ngFor="let detail of continuityContext.auditDetails" class="audit-item">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span>{{ detail }}</span>
+            </div>
+          </div>
+
+          <!-- If immediate predecessor is missing, provide quick action -->
+          <div *ngIf="!continuityContext.immediatePreviousAvailable && continuityContext.immediatePreviousMonth" class="predecessor-recommendation">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+            <span>Tip: For optimal rolling rest cycles and shift equality, generate <strong>{{ continuityContext.immediatePreviousMonthName }}</strong> first.</span>
+            <button class="btn btn-sm btn-outline-warning" (click)="switchToImmediatePrevious()">
+              Switch to {{ continuityContext.immediatePreviousMonthName }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Warnings Banner -->
       <div *ngIf="currentRoster && currentRoster.warnings && currentRoster.warnings.length > 0" class="warnings-banner card mb-3">
         <div class="warning-title">
-          <span>⚠️</span> <strong>Roster Rule Alerts ({{ currentRoster.warnings.length }}):</strong>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+          <strong>Roster Optimization Notices ({{ currentRoster.warnings.length }})</strong>
         </div>
         <ul class="warning-list">
           <li *ngFor="let w of currentRoster.warnings">{{ w }}</li>
         </ul>
       </div>
 
-      <!-- Main Roster Area -->
+      <!-- Loading State -->
       <div *ngIf="loading" class="loading-overlay">
         <div class="spinner"></div>
-        <p>Processing roster algorithms...</p>
+        <span>Processing roster optimization algorithms...</span>
       </div>
 
+      <!-- Empty State -->
       <div *ngIf="!loading && !currentRoster" class="empty-state card">
-        <div class="icon">📅</div>
+        <div class="empty-icon-box">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+        </div>
         <h3>No Roster Selected</h3>
-        <p>Select a month/year above and click <strong>"Generate Roster"</strong> to create a balanced schedule, or load an existing one.</p>
+        <p class="text-secondary">Select a target month and year above to generate an automated fair schedule, or load an existing roster from history.</p>
         <button class="btn btn-primary" (click)="generateRoster()">
-          <span>⚡ Generate for {{ getMonthName(selectedMonth) }} {{ selectedYear }}</span>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          Generate for {{ getMonthName(selectedMonth) }} {{ selectedYear }}
         </button>
       </div>
 
+      <!-- Main View Area -->
       <div *ngIf="!loading && currentRoster">
-        <!-- View Mode Switcher & Stats Header -->
+        <!-- View Toolbar -->
         <div class="view-toolbar card mb-2">
           <div class="view-tabs">
             <button class="tab-btn" [class.active]="activeTab === 'grid'" (click)="activeTab = 'grid'">
-              <span>📊</span> Monthly Grid
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+              Monthly Grid
             </button>
             <button class="tab-btn" [class.active]="activeTab === 'analytics'" (click)="activeTab = 'analytics'">
-              <span>📈</span> Fairness & Analytics
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+              Fairness & Analytics
             </button>
             <button class="tab-btn" [class.active]="activeTab === 'daily-coverage'" (click)="activeTab = 'daily-coverage'">
-              <span>🛡️</span> Daily Coverage Check
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+              Daily Coverage Check
             </button>
           </div>
 
           <div class="toolbar-info">
             <span class="status-indicator" [class.finalized]="currentRoster.status === 'FINALIZED'">
-              Status: <strong>{{ currentRoster.status }}</strong>
+              {{ currentRoster.status }}
             </span>
             <span class="stat-sep">•</span>
-            <span>Total Employees: <strong>{{ uniqueEmployeeIds.length }}</strong></span>
+            <span>Staff: <strong>{{ uniqueEmployeeIds.length }}</strong></span>
             <span class="stat-sep">•</span>
             <span>Days: <strong>{{ daysInMonth.length }}</strong></span>
-            <input
-              type="text"
-              class="form-control filter-input"
-              placeholder="Filter employee..."
-              [(ngModel)]="employeeFilter"
-            />
+            <div class="filter-wrapper">
+              <svg class="search-mini-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <input
+                type="text"
+                class="form-control filter-input"
+                placeholder="Filter staff..."
+                [(ngModel)]="employeeFilter"
+              />
+            </div>
           </div>
         </div>
 
@@ -181,30 +254,32 @@ interface ShiftSummaryItem {
         <div *ngIf="activeTab === 'grid'" class="card grid-card">
           <!-- Shift Legend -->
           <div class="legend-bar">
-            <span class="legend-title">Shift Legend:</span>
-            <div class="legend-items">
-              <div *ngFor="let s of shifts" class="legend-item">
-                <span class="legend-badge" [style.background-color]="s.colorCode || '#00b4d8'">
-                  {{ getShiftAbbreviation(s.shiftName) }}
-                </span>
-                <span>{{ s.shiftName }}</span>
-              </div>
-              <div class="legend-item">
-                <span class="legend-badge badge-off">OFF</span>
-                <span>Weekly Off</span>
+            <div class="legend-left">
+              <span class="legend-title">Shift Key:</span>
+              <div class="legend-items">
+                <div *ngFor="let s of shifts" class="legend-item">
+                  <span class="legend-badge" [style.background-color]="s.colorCode || '#1a73e8'">
+                    {{ getShiftAbbreviation(s.shiftName) }}
+                  </span>
+                  <span>{{ s.shiftName }}</span>
+                </div>
+                <div class="legend-item">
+                  <span class="legend-badge badge-off">OFF</span>
+                  <span>Weekly Rest Day</span>
+                </div>
               </div>
             </div>
             <div class="legend-tip">
-              💡 <em>Click any cell to edit shift or mark OFF</em>
+              Click any schedule cell to edit shift or mark day off
             </div>
           </div>
 
-          <!-- The Calendar Matrix Table -->
+          <!-- Calendar Matrix Table -->
           <div class="matrix-wrapper">
             <table class="roster-matrix">
               <thead>
                 <tr>
-                  <th class="col-emp-header sticky-col">Employee</th>
+                  <th class="col-emp-header sticky-col">Employee Name</th>
                   <th
                     *ngFor="let day of daysInMonth"
                     class="col-day-header"
@@ -218,10 +293,10 @@ interface ShiftSummaryItem {
                 </tr>
               </thead>
               <tbody>
-                <tr *ngFor="let empId of filteredEmployeeIds; let i = index">
+                <tr *ngFor="let empId of filteredEmployeeIds">
                   <td class="sticky-col emp-name-cell">
                     <div class="emp-name-wrapper">
-                      <span class="emp-avatar">{{ getEmployeeName(empId).charAt(0) }}</span>
+                      <span class="emp-avatar">{{ getEmployeeName(empId).charAt(0).toUpperCase() }}</span>
                       <span class="emp-name">{{ getEmployeeName(empId) }}</span>
                     </div>
                   </td>
@@ -234,7 +309,8 @@ interface ShiftSummaryItem {
                       class="shift-tag"
                       [style.background-color]="getShiftColor(empId, day.dateStr)"
                       [class.tag-off]="isOffDay(empId, day.dateStr)"
-                      [class.tag-manual]="isManualEdit(empId, day.dateStr)">
+                      [class.tag-manual]="isManualEdit(empId, day.dateStr)"
+                      [title]="(getEmployeeName(empId)) + ' - ' + day.dateStr + ': ' + getShiftDisplay(empId, day.dateStr)">
                       {{ getShiftDisplay(empId, day.dateStr) }}
                     </div>
                   </td>
@@ -251,8 +327,8 @@ interface ShiftSummaryItem {
               <tfoot>
                 <tr class="coverage-row" *ngFor="let s of shifts">
                   <td class="sticky-col coverage-label">
-                    <span class="dot" [style.background-color]="s.colorCode || '#00b4d8'"></span>
-                    {{ s.shiftName }} Staff
+                    <span class="dot" [style.background-color]="s.colorCode || '#1a73e8'"></span>
+                    <span>{{ s.shiftName }} Coverage</span>
                   </td>
                   <td
                     *ngFor="let day of daysInMonth"
@@ -263,17 +339,18 @@ interface ShiftSummaryItem {
                     <span class="req-small">/{{ getRequiredStaffCount(s, day.isWeekend) }}</span>
                   </td>
                   <td colspan="2" class="coverage-total">
-                    {{ getTotalMonthlyShiftCount(s.shiftName) }}
+                    {{ getTotalMonthlyShiftCount(s.shiftName) }} shifts
                   </td>
                 </tr>
                 <tr class="coverage-row off-row">
                   <td class="sticky-col coverage-label">
-                    <span class="dot off-dot"></span> Total OFF
+                    <span class="dot off-dot"></span>
+                    <span>Total Staff Off</span>
                   </td>
-                  <td *ngFor="let day of daysInMonth" class="coverage-cell">
+                  <td *ngFor="let day of daysInMonth" class="coverage-cell off-coverage-cell">
                     {{ getDailyOffStaffCount(day.dateStr) }}
                   </td>
-                  <td colspan="2"></td>
+                  <td colspan="2" class="coverage-total"></td>
                 </tr>
               </tfoot>
             </table>
@@ -285,31 +362,31 @@ interface ShiftSummaryItem {
           <div class="grid-2-cols mb-3">
             <div class="card stat-summary-card">
               <div class="card-header">
-                <h3>⚖️ Shift Distribution Fairness</h3>
-                <span class="badge badge-success">Optimized</span>
+                <h3>Workload Distribution</h3>
+                <span class="badge badge-success">Balanced</span>
               </div>
-              <p class="text-muted mb-2">
-                SmartRoster algorithms ensure fair distribution of Night shifts, Weekday shifts, and Weekend work across all team members.
+              <p class="text-secondary mb-3">
+                SmartRoster algorithms ensure fair distribution of night, weekday, and weekend work across all active personnel.
               </p>
               <div class="fairness-stats-grid">
                 <div class="f-stat">
                   <div class="f-val">{{ getAverageShiftsPerEmployee() }}</div>
-                  <div class="f-lbl">Avg Shifts / Person</div>
+                  <div class="f-lbl">Avg Shifts / Staff</div>
                 </div>
                 <div class="f-stat">
                   <div class="f-val">{{ getAverageOffsPerEmployee() }}</div>
-                  <div class="f-lbl">Avg OFFs / Person</div>
+                  <div class="f-lbl">Avg Rest Days</div>
                 </div>
                 <div class="f-stat">
                   <div class="f-val">{{ getTotalMonthlyAssignments() }}</div>
-                  <div class="f-lbl">Total Shift Slots</div>
+                  <div class="f-lbl">Assigned Shifts</div>
                 </div>
               </div>
             </div>
 
             <div class="card">
               <div class="card-header">
-                <h3>📊 Shift Type Breakdown</h3>
+                <h3>Shift Breakdown</h3>
               </div>
               <div class="shift-breakdown-list">
                 <div *ngFor="let s of shifts" class="breakdown-item">
@@ -318,12 +395,12 @@ interface ShiftSummaryItem {
                       <span class="dot" [style.background-color]="s.colorCode"></span>
                       {{ s.shiftName }}
                     </span>
-                    <span class="b-count">{{ getTotalMonthlyShiftCount(s.shiftName) }} slots</span>
+                    <span class="b-count">{{ getTotalMonthlyShiftCount(s.shiftName) }} slots ({{ getShiftPercentage(s.shiftName) }}%)</span>
                   </div>
                   <div class="progress-bar-bg">
                     <div
                       class="progress-bar-fill"
-                      [style.background-color]="s.colorCode || '#00b4d8'"
+                      [style.background-color]="s.colorCode || '#1a73e8'"
                       [style.width.%]="getShiftPercentage(s.shiftName)">
                     </div>
                   </div>
@@ -332,52 +409,57 @@ interface ShiftSummaryItem {
             </div>
           </div>
 
-          <!-- Employee Breakdown Table -->
+          <!-- Per-Employee Breakdown Table -->
           <div class="card">
             <div class="card-header">
-              <h3>👥 Per-Employee Workload Breakdown</h3>
-              <button class="btn btn-sm btn-secondary" (click)="exportExcel()">Export Report</button>
+              <h3>Per-Employee Workload Distribution</h3>
+              <button class="btn btn-sm btn-secondary" (click)="exportExcel()">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export Excel
+              </button>
             </div>
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th *ngFor="let s of shifts">{{ s.shiftName }}</th>
-                  <th>Weekly OFFs</th>
-                  <th>Total Shifts</th>
-                  <th>Fairness Index</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let empId of uniqueEmployeeIds">
-                  <td>
-                    <strong>{{ getEmployeeName(empId) }}</strong>
-                  </td>
-                  <td *ngFor="let s of shifts">
-                    {{ getEmployeeShiftTypeCount(empId, s.shiftName) }}
-                  </td>
-                  <td>
-                    <span class="badge badge-info">{{ getEmployeeOffCount(empId) }} OFFs</span>
-                  </td>
-                  <td>
-                    <strong>{{ getEmployeeShiftCount(empId) }}</strong>
-                  </td>
-                  <td>
-                    <span class="badge badge-success">✓ Balanced</span>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
+            <div class="table-container">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Employee Name</th>
+                    <th *ngFor="let s of shifts">{{ s.shiftName }}</th>
+                    <th>Weekly Offs</th>
+                    <th>Total Shifts</th>
+                    <th>Compliance</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let empId of uniqueEmployeeIds">
+                    <td>
+                      <strong class="text-heading">{{ getEmployeeName(empId) }}</strong>
+                    </td>
+                    <td *ngFor="let s of shifts">
+                      {{ getEmployeeShiftTypeCount(empId, s.shiftName) }}
+                    </td>
+                    <td>
+                      <span class="badge badge-info">{{ getEmployeeOffCount(empId) }} OFFs</span>
+                    </td>
+                    <td>
+                      <strong>{{ getEmployeeShiftCount(empId) }}</strong>
+                    </td>
+                    <td>
+                      <span class="badge badge-success">Balanced</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
         <!-- TAB 3: DAILY COVERAGE CHECK -->
         <div *ngIf="activeTab === 'daily-coverage'" class="card">
           <div class="card-header">
-            <h3>🛡️ Daily Staffing Requirements vs Actual Coverage</h3>
+            <h3>Daily Staffing Quota vs Actual Coverage</h3>
           </div>
-          <p class="text-muted mb-2">Detailed daily breakdown verifying whether weekday and weekend minimum requirements are satisfied.</p>
-          <div class="table-responsive">
+          <p class="text-secondary mb-3">Verification breakdown confirming required weekday and weekend staffing minimums are satisfied for each day of the month.</p>
+          <div class="table-container">
             <table class="data-table">
               <thead>
                 <tr>
@@ -385,7 +467,7 @@ interface ShiftSummaryItem {
                   <th>Day</th>
                   <th>Type</th>
                   <th *ngFor="let s of shifts">{{ s.shiftName }} (Req / Act)</th>
-                  <th>OFF Count</th>
+                  <th>Off Count</th>
                   <th>Status</th>
                 </tr>
               </thead>
@@ -409,7 +491,7 @@ interface ShiftSummaryItem {
                       class="badge"
                       [class.badge-success]="isAllStaffingMetForDay(day)"
                       [class.badge-danger]="!isAllStaffingMetForDay(day)">
-                      {{ isAllStaffingMetForDay(day) ? '✓ Optimal' : '⚠️ Deficit' }}
+                      {{ isAllStaffingMetForDay(day) ? 'Satisfied' : 'Deficit' }}
                     </span>
                   </td>
                 </tr>
@@ -423,27 +505,27 @@ interface ShiftSummaryItem {
       <div *ngIf="showEditModal" class="modal-backdrop" (click)="closeEditModal()">
         <div class="modal-content" (click)="$event.stopPropagation()">
           <div class="modal-header">
-            <h3>Edit Shift Assignment</h3>
-            <button class="close-btn" (click)="closeEditModal()">×</button>
+            <h3>Modify Shift Assignment</h3>
+            <button class="modal-close" (click)="closeEditModal()">✕</button>
           </div>
           <div class="modal-body">
             <div class="modal-emp-info">
-              <div><strong>Employee:</strong> {{ editEmployeeName }}</div>
-              <div><strong>Date:</strong> {{ editDate }}</div>
+              <div><span class="text-muted">Staff:</span> <strong>{{ editEmployeeName }}</strong></div>
+              <div><span class="text-muted">Date:</span> <strong>{{ editDate }}</strong></div>
             </div>
 
-            <div class="form-group mt-2">
-              <label class="form-label">Select Shift or Off</label>
+            <div class="form-group mt-3">
+              <label class="form-label">Select Shift Assignment</label>
               <div class="shift-radio-group">
                 <label
                   *ngFor="let s of shifts"
                   class="shift-radio-card"
-                  [class.selected]="editSelectedShift === s.shiftName"
+                  [class.selected]="!editIsWeeklyOff && editSelectedShift === s.shiftName"
                   (click)="selectModalShift(s.shiftName, false)">
-                  <span class="dot" [style.background-color]="s.colorCode || '#00b4d8'"></span>
+                  <span class="dot" [style.background-color]="s.colorCode || '#1a73e8'"></span>
                   <div class="radio-label">
                     <strong>{{ s.shiftName }}</strong>
-                    <small>Req: {{ s.weekdayCount }} (Wkday) / {{ s.weekendCount }} (Wkend)</small>
+                    <small class="text-muted">Demand: {{ s.weekdayCount }} (Wkday) / {{ s.weekendCount }} (Wkend)</small>
                   </div>
                 </label>
 
@@ -453,17 +535,17 @@ interface ShiftSummaryItem {
                   (click)="selectModalShift(null, true)">
                   <span class="dot off-dot"></span>
                   <div class="radio-label">
-                    <strong>Weekly OFF</strong>
-                    <small>Scheduled Rest Day</small>
+                    <strong>Scheduled Weekly OFF</strong>
+                    <small class="text-muted">Assigned Rest Day</small>
                   </div>
                 </label>
               </div>
             </div>
           </div>
-          <div class="modal-footer">
+          <div class="modal-actions">
             <button class="btn btn-secondary" (click)="closeEditModal()">Cancel</button>
             <button class="btn btn-primary" (click)="saveAssignmentEdit()" [disabled]="loading">
-              Save Change
+              Save Assignment
             </button>
           </div>
         </div>
@@ -471,10 +553,205 @@ interface ShiftSummaryItem {
     </div>
   `,
   styles: [`
+    .subtitle {
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+
+    .alert-close-btn {
+      margin-left: auto;
+      background: none;
+      border: none;
+      color: inherit;
+      cursor: pointer;
+      font-size: 0.85rem;
+      opacity: 0.8;
+      transition: opacity var(--transition-fast);
+    }
+
+    .alert-close-btn:hover {
+      opacity: 1;
+    }
+
+    /* Continuity Card */
+    .continuity-card {
+      padding: 1.25rem 1.5rem;
+      border-left: 4px solid var(--accent-primary);
+      background: var(--bg-card);
+    }
+
+    .continuity-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 0.75rem;
+      padding-bottom: 0.75rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .continuity-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.95rem;
+      color: var(--text-heading);
+    }
+
+    .badge-target {
+      background: rgba(26, 115, 232, 0.15);
+      color: var(--accent-primary-light);
+      border: 1px solid rgba(26, 115, 232, 0.4);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .continuity-status-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    .status-badge.status-success {
+      background: rgba(19, 115, 51, 0.18);
+      color: var(--accent-success-light);
+      border: 1px solid rgba(19, 115, 51, 0.4);
+    }
+
+    .status-badge.status-warning {
+      background: rgba(249, 171, 0, 0.15);
+      color: var(--accent-warning);
+      border: 1px solid rgba(249, 171, 0, 0.4);
+    }
+
+    .status-badge.status-invariant {
+      background: rgba(26, 115, 232, 0.12);
+      color: var(--accent-primary-light);
+      border: 1px solid rgba(26, 115, 232, 0.3);
+    }
+
+    .continuity-summary-msg {
+      font-size: 0.85rem;
+      color: var(--text-primary);
+      margin-bottom: 0.75rem;
+    }
+
+    .historical-pills-row {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 0.75rem;
+    }
+
+    .hist-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .hist-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .hist-pill {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      padding: 3px 10px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .hist-count {
+      color: var(--text-muted);
+      font-size: 0.7rem;
+    }
+
+    .audit-details-list {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .audit-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .audit-item svg {
+      color: var(--accent-success-light);
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .predecessor-recommendation {
+      margin-top: 10px;
+      padding: 10px 14px;
+      background: rgba(249, 171, 0, 0.08);
+      border: 1px solid rgba(249, 171, 0, 0.25);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 0.8rem;
+      color: var(--accent-warning);
+    }
+
+    .btn-outline-warning {
+      background: transparent;
+      border: 1px solid var(--accent-warning);
+      color: var(--accent-warning);
+      padding: 4px 10px;
+      font-size: 0.75rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all var(--transition-fast);
+      margin-left: auto;
+    }
+
+    .btn-outline-warning:hover {
+      background: var(--accent-warning);
+      color: #000;
+    }
+
+    .controls-card {
+      padding: 1.25rem 1.5rem;
+    }
+
     .roster-controls {
       display: flex;
       flex-wrap: wrap;
-      gap: 1.5rem;
+      gap: 1.25rem;
       align-items: flex-end;
     }
 
@@ -485,7 +762,7 @@ interface ShiftSummaryItem {
     }
 
     .control-label {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       font-weight: 700;
       color: var(--text-secondary);
       text-transform: uppercase;
@@ -496,6 +773,10 @@ interface ShiftSummaryItem {
       min-width: 140px;
     }
 
+    .quick-actions-group {
+      flex-shrink: 0;
+    }
+
     .quick-btns {
       display: flex;
       gap: 8px;
@@ -503,7 +784,7 @@ interface ShiftSummaryItem {
 
     .saved-rosters {
       flex: 1;
-      min-width: 250px;
+      min-width: 240px;
     }
 
     .roster-pills {
@@ -515,28 +796,28 @@ interface ShiftSummaryItem {
     }
 
     .roster-pill {
-      background: var(--bg-primary);
+      background: var(--bg-secondary);
       border: 1px solid var(--border-color);
       color: var(--text-primary);
       padding: 6px 12px;
       border-radius: 20px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
       transition: all var(--transition-fast);
     }
 
     .roster-pill:hover {
-      border-color: var(--accent-primary);
+      border-color: var(--border-hover);
       background: var(--bg-card-hover);
     }
 
     .roster-pill.active {
-      border-color: #84A282;
-      background: rgba(132, 162, 130, 0.2);
-      color: #FEFAF3;
+      border-color: var(--accent-primary);
+      background: rgba(26, 115, 232, 0.15);
+      color: #fff;
       font-weight: 600;
     }
 
@@ -544,37 +825,75 @@ interface ShiftSummaryItem {
       font-size: 0.65rem;
       padding: 2px 6px;
       border-radius: 10px;
-      background: rgba(227, 184, 116, 0.2);
+      background: rgba(249, 171, 0, 0.15);
       color: var(--accent-warning);
     }
 
     .pill-badge.badge-final {
-      background: rgba(132, 162, 130, 0.25);
-      color: #FEFAF3;
-      border: 1px solid rgba(132, 162, 130, 0.4);
+      background: rgba(52, 168, 83, 0.15);
+      color: var(--accent-success-light);
+      border: 1px solid rgba(52, 168, 83, 0.3);
     }
 
     /* Warnings Banner */
     .warnings-banner {
-      background: rgba(227, 184, 116, 0.08);
-      border-color: rgba(227, 184, 116, 0.3);
+      background: rgba(249, 171, 0, 0.06);
+      border: 1px solid rgba(249, 171, 0, 0.25);
       padding: 1rem 1.5rem;
     }
 
     .warning-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       color: var(--accent-warning);
       margin-bottom: 0.5rem;
+      font-size: 0.9rem;
     }
 
     .warning-list {
       margin: 0;
       padding-left: 1.5rem;
       color: var(--text-primary);
-      font-size: 0.875rem;
+      font-size: 0.85rem;
     }
 
     .warning-list li {
       margin-bottom: 4px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      background: var(--bg-card);
+      border: 1px dashed var(--border-color);
+      border-radius: var(--radius-lg);
+    }
+
+    .empty-icon-box {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem;
+      color: var(--text-muted);
+    }
+
+    .empty-state h3 {
+      font-size: 1.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+      max-width: 500px;
+      margin: 0 auto 1.5rem;
+      font-size: 0.9rem;
+      line-height: 1.5;
     }
 
     /* View Toolbar */
@@ -584,7 +903,7 @@ interface ShiftSummaryItem {
       align-items: center;
       flex-wrap: wrap;
       gap: 1rem;
-      padding: 1rem 1.5rem;
+      padding: 0.75rem 1.25rem;
     }
 
     .view-tabs {
@@ -596,14 +915,14 @@ interface ShiftSummaryItem {
       background: transparent;
       border: 1px solid var(--border-color);
       color: var(--text-secondary);
-      padding: 8px 16px;
+      padding: 7px 14px;
       border-radius: var(--radius-sm);
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
       transition: all var(--transition-fast);
     }
 
@@ -613,41 +932,56 @@ interface ShiftSummaryItem {
     }
 
     .tab-btn.active {
-      background: linear-gradient(135deg, #84A282 0%, #638361 100%);
-      color: #FEFAF3;
-      border-color: #84A282;
-      box-shadow: 0 2px 8px rgba(132, 162, 130, 0.3);
+      background: var(--accent-primary);
+      color: #fff;
+      border-color: var(--accent-primary);
+      box-shadow: 0 2px 8px rgba(26, 115, 232, 0.35);
     }
 
     .toolbar-info {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: var(--text-secondary);
+    }
+
+    .filter-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-mini-icon {
+      position: absolute;
+      left: 8px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .filter-input {
+      width: 150px;
+      padding: 5px 8px 5px 26px;
+      font-size: 0.78rem;
     }
 
     .stat-sep {
       color: var(--border-color);
     }
 
-    .filter-input {
-      width: 160px;
-      padding: 6px 10px;
-      font-size: 0.8rem;
-    }
-
     .status-indicator {
-      padding: 4px 10px;
+      padding: 3px 10px;
       border-radius: 20px;
-      background: rgba(227, 184, 116, 0.15);
+      font-size: 0.75rem;
+      font-weight: 700;
+      background: rgba(249, 171, 0, 0.15);
       color: var(--accent-warning);
     }
 
     .status-indicator.finalized {
-      background: rgba(132, 162, 130, 0.2);
-      color: #FEFAF3;
-      border: 1px solid rgba(132, 162, 130, 0.4);
+      background: rgba(52, 168, 83, 0.15);
+      color: var(--accent-success-light);
+      border: 1px solid rgba(52, 168, 83, 0.3);
     }
 
     /* Legend */
@@ -657,16 +991,24 @@ interface ShiftSummaryItem {
       justify-content: space-between;
       flex-wrap: wrap;
       gap: 1rem;
-      padding-bottom: 1rem;
+      padding-bottom: 0.85rem;
       margin-bottom: 1rem;
       border-bottom: 1px solid var(--border-color);
     }
 
+    .legend-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
     .legend-title {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       font-weight: 700;
       color: var(--text-secondary);
       text-transform: uppercase;
+      letter-spacing: 0.5px;
     }
 
     .legend-items {
@@ -685,8 +1027,8 @@ interface ShiftSummaryItem {
 
     .legend-badge {
       min-width: 28px;
-      height: 24px;
-      padding: 0 4px;
+      height: 22px;
+      padding: 0 6px;
       border-radius: 4px;
       display: flex;
       align-items: center;
@@ -697,12 +1039,9 @@ interface ShiftSummaryItem {
     }
 
     .legend-badge.badge-off {
-      background: #F6E2E9;
-      color: #5a2636;
-      width: auto;
-      padding: 0 8px;
-      font-weight: 800;
-      border: 1px solid #e5b3c2;
+      background: #1c1d24;
+      color: var(--text-muted);
+      border: 1px solid var(--border-color);
     }
 
     .legend-tip {
@@ -712,7 +1051,7 @@ interface ShiftSummaryItem {
 
     /* Matrix Table */
     .grid-card {
-      padding: 1.5rem;
+      padding: 1.25rem;
       overflow: hidden;
     }
 
@@ -721,7 +1060,7 @@ interface ShiftSummaryItem {
       overflow-x: auto;
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
-      background: var(--bg-secondary);
+      background: var(--bg-primary);
     }
 
     .roster-matrix {
@@ -737,7 +1076,7 @@ interface ShiftSummaryItem {
       border-bottom: 1px solid var(--border-color);
       text-align: center;
       padding: 6px 4px;
-      min-width: 40px;
+      min-width: 38px;
     }
 
     .sticky-col {
@@ -745,20 +1084,23 @@ interface ShiftSummaryItem {
       left: 0;
       background: var(--bg-card);
       z-index: 10;
-      min-width: 170px !important;
+      min-width: 180px !important;
       text-align: left !important;
-      padding-left: 12px !important;
+      padding-left: 14px !important;
       border-right: 2px solid var(--border-hover) !important;
     }
 
     .col-emp-header {
-      background: var(--bg-card) !important;
+      background: var(--bg-secondary) !important;
       font-weight: 700;
       color: var(--text-heading);
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
     }
 
     .col-day-header {
-      background: var(--bg-card);
+      background: var(--bg-secondary);
       padding: 8px 4px !important;
     }
 
@@ -776,39 +1118,42 @@ interface ShiftSummaryItem {
     }
 
     .col-weekend {
-      background: rgba(246, 226, 233, 0.08) !important;
-      border-bottom: 2px solid rgba(246, 226, 233, 0.3) !important;
+      background: rgba(26, 115, 232, 0.05) !important;
+      border-bottom: 2px solid rgba(26, 115, 232, 0.3) !important;
     }
 
     .col-sunday {
-      background: rgba(246, 226, 233, 0.12) !important;
-      border-bottom: 2px solid #F6E2E9 !important;
+      background: rgba(26, 115, 232, 0.09) !important;
+      border-bottom: 2px solid var(--accent-primary) !important;
     }
 
     .col-summary-header {
-      background: var(--bg-card);
+      background: var(--bg-secondary);
       min-width: 55px !important;
       font-size: 0.75rem;
       color: var(--text-secondary);
+      font-weight: 700;
+      text-transform: uppercase;
     }
 
     .emp-name-wrapper {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
 
     .emp-avatar {
-      width: 24px;
-      height: 24px;
+      width: 26px;
+      height: 26px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #84A282 0%, #B8CFB3 100%);
-      color: #121915;
+      background: linear-gradient(135deg, var(--accent-primary) 0%, #1558b0 100%);
+      color: #fff;
       display: flex;
       align-items: center;
       justify-content: center;
       font-weight: 700;
-      font-size: 0.7rem;
+      font-size: 0.75rem;
+      flex-shrink: 0;
     }
 
     .emp-name {
@@ -817,7 +1162,7 @@ interface ShiftSummaryItem {
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      max-width: 120px;
+      max-width: 130px;
     }
 
     .shift-cell {
@@ -827,24 +1172,25 @@ interface ShiftSummaryItem {
     }
 
     .shift-cell:hover {
-      background: rgba(132, 162, 130, 0.2) !important;
+      background: rgba(26, 115, 232, 0.15) !important;
     }
 
     .cell-weekend {
-      background: rgba(246, 226, 233, 0.03);
+      background: rgba(255, 255, 255, 0.01);
     }
 
     .shift-tag {
       display: inline-block;
-      width: 36px;
-      height: 28px;
-      line-height: 28px;
+      width: 34px;
+      height: 26px;
+      line-height: 26px;
       border-radius: 4px;
       font-weight: 700;
       color: #fff;
       font-size: 0.7rem;
-      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
       transition: transform var(--transition-fast);
+      user-select: none;
     }
 
     .shift-tag:hover {
@@ -852,11 +1198,11 @@ interface ShiftSummaryItem {
     }
 
     .tag-off {
-      background: #F6E2E9 !important;
-      color: #5a2636 !important;
-      font-weight: 800;
-      border: 1px solid #e5b3c2;
-      box-shadow: 0 1px 3px rgba(246, 226, 233, 0.25);
+      background: #181920 !important;
+      color: #717582 !important;
+      font-weight: 700;
+      border: 1px solid #282a32;
+      box-shadow: none;
     }
 
     .tag-manual {
@@ -869,28 +1215,27 @@ interface ShiftSummaryItem {
     }
 
     .count-shifts {
-      color: var(--palette-sage-light);
-      background: rgba(184, 207, 179, 0.08);
+      color: var(--accent-primary-light);
+      background: rgba(26, 115, 232, 0.05);
     }
 
     .count-off {
-      color: var(--palette-blush);
-      background: rgba(246, 226, 233, 0.1);
-      font-weight: 800;
+      color: var(--text-secondary);
+      background: rgba(255, 255, 255, 0.02);
     }
 
     /* Footer Coverage Rows */
     .coverage-row td {
       font-weight: 600;
       font-size: 0.75rem;
-      background: var(--bg-card);
+      background: var(--bg-secondary);
     }
 
     .coverage-label {
       font-size: 0.75rem !important;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 8px;
     }
 
     .dot {
@@ -901,7 +1246,7 @@ interface ShiftSummaryItem {
     }
 
     .off-dot {
-      background: #F6E2E9;
+      background: #717582;
     }
 
     .coverage-cell {
@@ -909,13 +1254,17 @@ interface ShiftSummaryItem {
     }
 
     .coverage-met {
-      color: var(--palette-sage-light);
+      color: var(--accent-success-light);
     }
 
     .coverage-deficit {
       color: var(--accent-danger-light);
-      background: rgba(226, 125, 142, 0.15) !important;
+      background: rgba(234, 67, 53, 0.15) !important;
       font-weight: 800;
+    }
+
+    .off-coverage-cell {
+      color: var(--text-secondary);
     }
 
     .req-small {
@@ -925,26 +1274,26 @@ interface ShiftSummaryItem {
 
     .coverage-total {
       font-weight: 700;
-      color: var(--palette-cream);
+      color: var(--text-primary);
+      text-align: center;
     }
 
     /* Analytics Tab */
     .grid-2-cols {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 1.5rem;
+      gap: 1.25rem;
     }
 
     .fairness-stats-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 1rem;
-      margin-top: 1rem;
+      gap: 0.75rem;
     }
 
     .f-stat {
-      background: var(--bg-primary);
-      padding: 1.25rem;
+      background: var(--bg-secondary);
+      padding: 1.25rem 0.75rem;
       border-radius: var(--radius-md);
       text-align: center;
       border: 1px solid var(--border-color);
@@ -953,13 +1302,14 @@ interface ShiftSummaryItem {
     .f-val {
       font-size: 1.8rem;
       font-weight: 800;
-      color: var(--palette-sage-light);
+      color: var(--accent-primary-light);
     }
 
     .f-lbl {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       color: var(--text-secondary);
       text-transform: uppercase;
+      letter-spacing: 0.4px;
       margin-top: 4px;
     }
 
@@ -985,6 +1335,7 @@ interface ShiftSummaryItem {
 
     .b-count {
       color: var(--text-secondary);
+      font-size: 0.8rem;
     }
 
     .progress-bar-bg {
@@ -1005,33 +1356,43 @@ interface ShiftSummaryItem {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 1rem;
+      margin-bottom: 1.25rem;
       padding-bottom: 0.75rem;
       border-bottom: 1px solid var(--border-color);
     }
 
-    .close-btn {
+    .modal-header h3 {
+      font-size: 1.15rem;
+      margin: 0;
+    }
+
+    .modal-close {
       background: none;
       border: none;
-      font-size: 1.5rem;
-      color: var(--text-muted);
+      color: var(--text-secondary);
+      font-size: 1.2rem;
       cursor: pointer;
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: var(--text-primary);
     }
 
     .modal-emp-info {
-      background: var(--bg-primary);
-      padding: 10px 14px;
+      background: var(--bg-secondary);
+      padding: 12px 16px;
       border-radius: var(--radius-sm);
       font-size: 0.85rem;
       display: flex;
       justify-content: space-between;
+      border: 1px solid var(--border-color);
     }
 
     .shift-radio-group {
       display: flex;
       flex-direction: column;
       gap: 8px;
-      margin-top: 10px;
     }
 
     .shift-radio-card {
@@ -1039,7 +1400,7 @@ interface ShiftSummaryItem {
       align-items: center;
       gap: 12px;
       padding: 12px;
-      background: var(--bg-primary);
+      background: var(--bg-secondary);
       border: 1px solid var(--border-color);
       border-radius: var(--radius-md);
       cursor: pointer;
@@ -1048,11 +1409,12 @@ interface ShiftSummaryItem {
 
     .shift-radio-card:hover {
       border-color: var(--border-hover);
+      background: var(--bg-card-hover);
     }
 
     .shift-radio-card.selected {
       border-color: var(--accent-primary);
-      background: rgba(132, 162, 130, 0.15);
+      background: rgba(26, 115, 232, 0.12);
     }
 
     .radio-label {
@@ -1061,11 +1423,10 @@ interface ShiftSummaryItem {
     }
 
     .radio-label small {
-      color: var(--text-muted);
-      font-size: 0.75rem;
+      font-size: 0.72rem;
     }
 
-    .modal-footer {
+    .modal-actions {
       display: flex;
       justify-content: flex-end;
       gap: 10px;
@@ -1086,6 +1447,7 @@ export class RosterComponent implements OnInit {
   allRosters: Roster[] = [];
   shifts: ShiftConfig[] = [];
   employees: Employee[] = [];
+  continuityContext: ContinuityContext | null = null;
 
   selectedMonth: number = new Date().getMonth() + 1;
   selectedYear: number = new Date().getFullYear();
@@ -1129,6 +1491,7 @@ export class RosterComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadInitialData();
+    this.checkContinuityContext();
   }
 
   loadInitialData(): void {
@@ -1149,7 +1512,6 @@ export class RosterComponent implements OnInit {
     this.rosterService.getAllRosters().subscribe({
       next: (rosters) => {
         this.allRosters = rosters;
-        // If current month roster exists, select it
         const found = rosters.find(
           (r) => r.month === this.selectedMonth && r.year === this.selectedYear
         );
@@ -1161,8 +1523,24 @@ export class RosterComponent implements OnInit {
     });
   }
 
+  checkContinuityContext(): void {
+    this.rosterService.getContinuityContext(this.selectedMonth, this.selectedYear).subscribe({
+      next: (ctx) => (this.continuityContext = ctx),
+      error: (err) => console.error('Error checking continuity context', err)
+    });
+  }
+
+  switchToImmediatePrevious(): void {
+    if (this.continuityContext?.immediatePreviousMonth && this.continuityContext?.immediatePreviousYear) {
+      this.selectedMonth = this.continuityContext.immediatePreviousMonth;
+      this.selectedYear = this.continuityContext.immediatePreviousYear;
+      this.onMonthYearChange();
+    }
+  }
+
   onMonthYearChange(): void {
     this.computeDaysInMonth();
+    this.checkContinuityContext();
     this.loadRosterForMonth(this.selectedMonth, this.selectedYear);
   }
 
@@ -1178,7 +1556,7 @@ export class RosterComponent implements OnInit {
           this.currentRoster = null;
         }
       },
-      error: (err) => {
+      error: () => {
         this.loading = false;
         this.currentRoster = null;
       }
@@ -1188,7 +1566,6 @@ export class RosterComponent implements OnInit {
   generateRoster(): void {
     this.clearMessages();
 
-    // Check if roster already exists for selected month/year
     const existingRoster = this.allRosters.find(
       (r) => r.month === this.selectedMonth && r.year === this.selectedYear
     );
@@ -1213,13 +1590,14 @@ export class RosterComponent implements OnInit {
       next: (roster) => {
         this.loading = false;
         this.setCurrentRoster(roster);
-        this.successMessage = `Roster for ${this.getMonthName(this.selectedMonth)} ${this.selectedYear} generated successfully!`;
+        this.successMessage = `Roster for ${this.getMonthName(this.selectedMonth)} ${this.selectedYear} generated successfully`;
         this.loadAllRosters();
+        this.checkContinuityContext();
       },
       error: (err) => {
         this.loading = false;
         this.errorMessage =
-          err.error?.message || err.message || 'Failed to generate roster. Please check employee and shift configurations.';
+          err.error?.message || err.message || 'Failed to generate roster. Please check employee count and shift requirements.';
       }
     });
   }
@@ -1228,6 +1606,7 @@ export class RosterComponent implements OnInit {
     this.selectedMonth = r.month;
     this.selectedYear = r.year;
     this.weeklyOffPerEmployee = r.weeklyOffPerEmployee || 2;
+    this.checkContinuityContext();
     if (r.id) {
       this.rosterService.getRoster(r.id).subscribe({
         next: (fullRoster) => this.setCurrentRoster(fullRoster),
@@ -1319,18 +1698,17 @@ export class RosterComponent implements OnInit {
 
   getShiftAbbreviation(shiftName: string): string {
     if (!shiftName) return '-';
-    // Return first 2 characters uppercased (e.g., "Morning" -> "MO", "Evening" -> "EV", "Night" -> "NI")
     return shiftName.substring(0, 2).toUpperCase();
   }
 
   getShiftColor(employeeId: number, dateStr: string): string {
     const a = this.getAssignment(employeeId, dateStr);
-    if (!a || a.isWeeklyOff || !a.shiftName) return '#253342';
+    if (!a || a.isWeeklyOff || !a.shiftName) return 'transparent';
 
     const shift = this.shifts.find(
       (s) => s.shiftName.toLowerCase() === a.shiftName?.toLowerCase()
     );
-    return shift?.colorCode || '#84A282';
+    return shift?.colorCode || 'var(--accent-primary)';
   }
 
   isOffDay(employeeId: number, dateStr: string): boolean {
@@ -1367,7 +1745,6 @@ export class RosterComponent implements OnInit {
     ).length;
   }
 
-  // Daily Staffing helpers
   getDailyShiftStaffCount(dateStr: string, shiftName: string): number {
     if (!this.currentRoster?.assignments) return 0;
     return this.currentRoster.assignments.filter(
@@ -1416,8 +1793,7 @@ export class RosterComponent implements OnInit {
 
   getTotalMonthlyAssignments(): number {
     if (!this.currentRoster?.assignments) return 0;
-    return this.currentRoster.assignments.filter((a) => !a.isWeeklyOff && a.shiftName)
-      .length;
+    return this.currentRoster.assignments.filter((a) => !a.isWeeklyOff && a.shiftName).length;
   }
 
   getShiftPercentage(shiftName: string): number {
@@ -1438,7 +1814,6 @@ export class RosterComponent implements OnInit {
     return +(totalOffs / this.uniqueEmployeeIds.length).toFixed(1);
   }
 
-  // Modal Actions
   openEditModal(employeeId: number, dateStr: string): void {
     const a = this.getAssignment(employeeId, dateStr);
     this.editEmployeeId = employeeId;
@@ -1476,9 +1851,9 @@ export class RosterComponent implements OnInit {
           this.loading = false;
           this.setCurrentRoster(updated);
           this.closeEditModal();
-          this.successMessage = `Updated assignment for ${this.editEmployeeName} on ${this.editDate}`;
+          this.successMessage = `Assignment updated for ${this.editEmployeeName} on ${this.editDate}`;
         },
-        error: (err) => {
+        error: () => {
           this.loading = false;
           this.errorMessage = 'Failed to update assignment.';
         }
@@ -1497,7 +1872,7 @@ export class RosterComponent implements OnInit {
         this.successMessage = 'Roster successfully marked as FINALIZED.';
         this.loadAllRosters();
       },
-      error: (err) => {
+      error: () => {
         this.loading = false;
         this.errorMessage = 'Failed to finalize roster.';
       }
@@ -1519,9 +1894,9 @@ export class RosterComponent implements OnInit {
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(url);
-        this.successMessage = 'Excel spreadsheet downloaded successfully!';
+        this.successMessage = 'Excel spreadsheet downloaded successfully';
       },
-      error: (err) => {
+      error: () => {
         this.loading = false;
         this.errorMessage = 'Failed to download Excel export.';
       }
@@ -1555,7 +1930,7 @@ export class RosterComponent implements OnInit {
         this.currentRoster = null;
         this.uniqueEmployeeIds = [];
         this.daysInMonth = [];
-        this.successMessage = `Roster for ${monthName} ${year} has been removed.`;
+        this.successMessage = `Roster for ${monthName} ${year} removed successfully.`;
         this.loadAllRosters();
       },
       error: (err) => {
