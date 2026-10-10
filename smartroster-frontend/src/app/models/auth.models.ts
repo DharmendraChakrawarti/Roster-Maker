@@ -6,8 +6,17 @@ export interface User {
   fullName: string;
   department: string;
   active: boolean;
+  managerId?: number;
+  managerName?: string;
   lastLoginAt?: string;
   createdAt: string;
+}
+
+export interface ManagerSummary {
+  id: number;
+  fullName: string;
+  username: string;
+  department: string;
 }
 
 export interface AuthResponse {
@@ -23,6 +32,8 @@ export interface CreateUserRequest {
   fullName: string;
   role?: string;
   department?: string;
+  managerId?: number;
+  managerName?: string;
 }
 
 export interface UpdateUserRequest {
@@ -32,6 +43,7 @@ export interface UpdateUserRequest {
   role?: string;
   active?: boolean;
   newPassword?: string;
+  managerId?: number;
 }
 
 export interface AdminStats {
@@ -42,3 +54,17 @@ export interface AdminStats {
   userCount: number;
   activeEmployeesCount: number;
 }
+
+export interface Department {
+  id: number;
+  name: string;
+  description?: string;
+  createdAt: string;
+  userCount: number;
+}
+
+export interface CreateDepartmentRequest {
+  name: string;
+  description?: string;
+}
+

@@ -7,6 +7,7 @@ public class UpdateUserRequest {
     private String role;
     private Boolean active;
     private String newPassword;
+    private Long managerId;
 
     public UpdateUserRequest() {}
 
@@ -27,4 +28,7 @@ public class UpdateUserRequest {
 
     public String getNewPassword() { return newPassword; }
     public void setNewPassword(String newPassword) { this.newPassword = newPassword; }
+
+    public Long getManagerId() { return managerId; }
+    public void setManagerId(Long managerId) { this.managerId = managerId; }
 }

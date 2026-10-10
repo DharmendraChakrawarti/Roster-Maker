@@ -39,7 +39,22 @@ public class RosterService {
     }
 
     public List<RosterDTO> getAllRosters() {
-        return rosterRepository.findAllByOrderByYearDescMonthDesc().stream()
+        return getAllRosters(null);
+    }
+
+    public List<RosterDTO> getAllRosters(Long managerId) {
+        List<Roster> list;
+        if (managerId != null) {
+            list = rosterRepository.findByManagerIdOrderByYearDescMonthDesc(managerId);
+            if (list.isEmpty()) {
+                list = rosterRepository.findAllByOrderByYearDescMonthDesc().stream()
+                        .filter(r -> r.getManagerId() == null)
+                        .collect(Collectors.toList());
+            }
+        } else {
+            list = rosterRepository.findAllByOrderByYearDescMonthDesc();
+        }
+        return list.stream()
                 .map(r -> {
                     RosterDTO dto = new RosterDTO();
                     dto.setId(r.getId());
@@ -47,6 +62,8 @@ public class RosterService {
                     dto.setYear(r.getYear());
                     dto.setStatus(r.getStatus());
                     dto.setWeeklyOffPerEmployee(r.getWeeklyOffPerEmployee());
+                    dto.setManagerId(r.getManagerId());
+                    dto.setManagerName(r.getManagerName());
                     return dto;
                 })
                 .collect(Collectors.toList());
@@ -61,9 +78,19 @@ public class RosterService {
     }
 
     public RosterDTO getRosterByMonthYear(int month, int year) {
-        Roster roster = rosterRepository.findByMonthAndYear(month, year)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No roster found for " + month + "/" + year));
+        return getRosterByMonthYear(month, year, null);
+    }
+
+    public RosterDTO getRosterByMonthYear(int month, int year, Long managerId) {
+        Optional<Roster> opt = Optional.empty();
+        if (managerId != null) {
+            opt = rosterRepository.findByMonthAndYearAndManagerId(month, year, managerId);
+        }
+        if (opt.isEmpty()) {
+            opt = rosterRepository.findByMonthAndYear(month, year);
+        }
+        Roster roster = opt.orElseThrow(() -> new ResourceNotFoundException(
+                "No roster found for " + month + "/" + year));
         RosterDTO dto = buildRosterDTO(roster);
         dto.setWarnings(validateRoster(roster.getId()));
         return dto;
@@ -101,14 +128,23 @@ public class RosterService {
      *    - Last day shift (strictly enforces 16h rest rule against Day 1 Morning shift)
      *    - Off block completion status (completes multi-day off block on Day 1 if M-1 ended on Day 1 of off)
      */
-    private HistoricalContext loadHistoricalContext(int currentMonth, int currentYear, List<Employee> employees) {
+    private HistoricalContext loadHistoricalContext(int currentMonth, int currentYear, List<Employee> employees, Long managerId) {
         YearMonth currentYM = YearMonth.of(currentYear, currentMonth);
         YearMonth immediatePrevYM = currentYM.minusMonths(1);
         int prevMonth = immediatePrevYM.getMonthValue();
         int prevYear = immediatePrevYM.getYear();
 
         // 1. Find all rosters prior to currentYM in ascending chronological order
-        List<Roster> allRosters = rosterRepository.findAllByOrderByYearDescMonthDesc();
+        List<Roster> allRosters;
+        if (managerId != null) {
+            allRosters = rosterRepository.findByManagerIdOrderByYearDescMonthDesc(managerId);
+            if (allRosters.isEmpty()) {
+                allRosters = rosterRepository.findAllByOrderByYearDescMonthDesc();
+            }
+        } else {
+            allRosters = rosterRepository.findAllByOrderByYearDescMonthDesc();
+        }
+
         List<Roster> priorRosters = allRosters.stream()
                 .filter(r -> YearMonth.of(r.getYear(), r.getMonth()).isBefore(currentYM))
                 .sorted(Comparator.comparing(r -> YearMonth.of(r.getYear(), r.getMonth())))
@@ -204,11 +240,24 @@ public class RosterService {
      * to the user on the screen.
      */
     public ContinuityContextDTO getContinuityContext(int targetMonth, int targetYear) {
+        return getContinuityContext(targetMonth, targetYear, null);
+    }
+
+    public ContinuityContextDTO getContinuityContext(int targetMonth, int targetYear, Long managerId) {
         YearMonth targetYM = YearMonth.of(targetYear, targetMonth);
         String targetMonthName = targetYM.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
 
-        List<Employee> employees = employeeRepository.findByActiveTrueOrderByNameAsc();
-        HistoricalContext hist = loadHistoricalContext(targetMonth, targetYear, employees);
+        List<Employee> employees;
+        if (managerId != null) {
+            employees = employeeRepository.findByManagerIdAndActiveTrueOrderByNameAsc(managerId);
+            if (employees.isEmpty()) {
+                employees = employeeRepository.findByActiveTrueOrderByNameAsc();
+            }
+        } else {
+            employees = employeeRepository.findByActiveTrueOrderByNameAsc();
+        }
+
+        HistoricalContext hist = loadHistoricalContext(targetMonth, targetYear, employees, managerId);
 
         ContinuityContextDTO dto = new ContinuityContextDTO();
         dto.setTargetMonth(targetMonth);
@@ -282,14 +331,29 @@ public class RosterService {
      * 4. Multi-Objective Cost Optimization: Solves bipartite shift assignment with zero rest violations,
      *    ergonomic forward transitions (Morning -> Evening -> Night), and equalized shift distribution.
      */
-    @Transactional
     public RosterDTO generateRoster(GenerateRosterRequest request) {
+        return generateRoster(request, request.getManagerId(), null);
+    }
+
+    @Transactional
+    public RosterDTO generateRoster(GenerateRosterRequest request, Long managerId, String managerName) {
         int month = request.getMonth();
         int year = request.getYear();
         int weeklyOffsPerEmployee = (request.getWeeklyOffPerEmployee() != null && request.getWeeklyOffPerEmployee() > 0)
                 ? request.getWeeklyOffPerEmployee() : 2;
 
-        List<Employee> employees = employeeRepository.findByActiveTrueOrderByNameAsc();
+        Long targetMgrId = (managerId != null) ? managerId : request.getManagerId();
+
+        List<Employee> employees;
+        if (targetMgrId != null) {
+            employees = employeeRepository.findByManagerIdAndActiveTrueOrderByNameAsc(targetMgrId);
+            if (employees.isEmpty()) {
+                employees = employeeRepository.findByActiveTrueOrderByNameAsc();
+            }
+        } else {
+            employees = employeeRepository.findByActiveTrueOrderByNameAsc();
+        }
+
         List<ShiftConfig> shiftConfigs = shiftConfigRepository.findByActiveTrueOrderByDisplayOrderAsc();
 
         List<String> warnings = new ArrayList<>();
@@ -305,26 +369,34 @@ public class RosterService {
         YearMonth yearMonth = YearMonth.of(year, month);
         int daysInMonth = yearMonth.lengthOfMonth();
 
-        // Clean up any existing roster for this month/year
-        Optional<Roster> existingOpt = rosterRepository.findByMonthAndYear(month, year);
+        // Clean up any existing roster for this month/year for this manager
+        Optional<Roster> existingOpt;
+        if (targetMgrId != null) {
+            existingOpt = rosterRepository.findByMonthAndYearAndManagerId(month, year, targetMgrId);
+        } else {
+            existingOpt = rosterRepository.findByMonthAndYear(month, year);
+        }
+
         Roster roster;
         if (existingOpt.isPresent()) {
             roster = existingOpt.get();
             roster.setStatus("DRAFT");
             roster.setWeeklyOffPerEmployee(weeklyOffsPerEmployee);
+            if (targetMgrId != null) roster.setManagerId(targetMgrId);
+            if (managerName != null) roster.setManagerName(managerName);
             roster = rosterRepository.saveAndFlush(roster);
             assignmentRepository.deleteByRosterId(roster.getId());
             assignmentRepository.flush();
         } else {
-            roster = new Roster(month, year);
+            roster = new Roster(month, year, targetMgrId, managerName);
             roster.setWeeklyOffPerEmployee(weeklyOffsPerEmployee);
             roster = rosterRepository.saveAndFlush(roster);
         }
 
         // -------------------------------------------------------------
-        // Step 1: Check EVERY Previous Month Context
+        // Step 1: Check EVERY Previous Month Context for this manager
         // -------------------------------------------------------------
-        HistoricalContext histCtx = loadHistoricalContext(month, year, employees);
+        HistoricalContext histCtx = loadHistoricalContext(month, year, employees, targetMgrId);
 
         // -------------------------------------------------------------
         // Step 2: Strict 5-Day Work Week Off Planning (Never 6 Days)
@@ -1082,6 +1154,8 @@ public class RosterService {
         dto.setYear(roster.getYear());
         dto.setStatus(roster.getStatus());
         dto.setWeeklyOffPerEmployee(roster.getWeeklyOffPerEmployee());
+        dto.setManagerId(roster.getManagerId());
+        dto.setManagerName(roster.getManagerName());
 
         List<RosterAssignment> assignments = assignmentRepository.findByRosterIdWithEmployee(roster.getId());
 

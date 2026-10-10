@@ -18,6 +18,8 @@ public class GenerateRosterRequest {
     @Max(value = 3, message = "Weekly offs must be <= 3")
     private Integer weeklyOffPerEmployee = 1;
 
+    private Long managerId;
+
     public GenerateRosterRequest() {}
 
     public Integer getMonth() { return month; }
@@ -26,4 +28,6 @@ public class GenerateRosterRequest {
     public void setYear(Integer year) { this.year = year; }
     public Integer getWeeklyOffPerEmployee() { return weeklyOffPerEmployee; }
     public void setWeeklyOffPerEmployee(Integer weeklyOffPerEmployee) { this.weeklyOffPerEmployee = weeklyOffPerEmployee; }
+    public Long getManagerId() { return managerId; }
+    public void setManagerId(Long managerId) { this.managerId = managerId; }
 }

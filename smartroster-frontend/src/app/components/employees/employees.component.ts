@@ -51,42 +51,44 @@ import { Employee } from '../../models/models';
           <button class="btn btn-primary" (click)="showBulkModal = true">Add Employees</button>
         </div>
 
-        <table class="data-table" *ngIf="!loading && filteredEmployees.length > 0">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Name</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let emp of filteredEmployees; let i = index">
-              <td class="text-muted">{{ i + 1 }}</td>
-              <td>
-                <span *ngIf="editingId !== emp.id">{{ emp.name }}</span>
-                <input *ngIf="editingId === emp.id" type="text" class="form-control"
-                       [(ngModel)]="editName" (keyup.enter)="saveEdit(emp)"
-                       (keyup.escape)="cancelEdit()">
-              </td>
-              <td>
-                <span class="badge badge-success">Active</span>
-              </td>
-              <td>
-                <div class="flex gap-1">
-                  <button *ngIf="editingId !== emp.id" class="btn btn-sm btn-secondary"
-                          (click)="startEdit(emp)">Edit</button>
-                  <button *ngIf="editingId === emp.id" class="btn btn-sm btn-success"
-                          (click)="saveEdit(emp)">Save</button>
-                  <button *ngIf="editingId === emp.id" class="btn btn-sm btn-secondary"
-                          (click)="cancelEdit()">Cancel</button>
-                  <button *ngIf="editingId !== emp.id" class="btn btn-sm btn-danger"
-                          (click)="confirmDelete(emp)">Remove</button>
-                </div>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="table-responsive" *ngIf="!loading && filteredEmployees.length > 0">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let emp of filteredEmployees; let i = index">
+                <td class="text-muted">{{ i + 1 }}</td>
+                <td>
+                  <span *ngIf="editingId !== emp.id">{{ emp.name }}</span>
+                  <input *ngIf="editingId === emp.id" type="text" class="form-control"
+                         [(ngModel)]="editName" (keyup.enter)="saveEdit(emp)"
+                         (keyup.escape)="cancelEdit()">
+                </td>
+                <td>
+                  <span class="badge badge-success">Active</span>
+                </td>
+                <td>
+                  <div class="flex gap-1">
+                    <button *ngIf="editingId !== emp.id" class="btn btn-sm btn-secondary"
+                            (click)="startEdit(emp)">Edit</button>
+                    <button *ngIf="editingId === emp.id" class="btn btn-sm btn-success"
+                            (click)="saveEdit(emp)">Save</button>
+                    <button *ngIf="editingId === emp.id" class="btn btn-sm btn-secondary"
+                            (click)="cancelEdit()">Cancel</button>
+                    <button *ngIf="editingId !== emp.id" class="btn btn-sm btn-danger"
+                            (click)="confirmDelete(emp)">Remove</button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- Bulk Add Modal -->
@@ -145,7 +147,58 @@ import { Employee } from '../../models/models';
     }
 
     @media (max-width: 768px) {
-      .search-input { width: 100%; }
+      .card-header {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.85rem;
+      }
+
+      .card-header h3 {
+        font-size: 1.25rem !important;
+        font-weight: 800;
+      }
+
+      .search-input {
+        width: 100% !important;
+        min-height: 48px;
+        font-size: 1rem !important;
+      }
+
+      .empty-state {
+        padding: 3rem 1.5rem !important;
+      }
+
+      .empty-state p {
+        font-size: 1.05rem !important;
+        line-height: 1.5;
+      }
+
+      .empty-state .btn {
+        width: 100%;
+        min-height: 48px;
+        font-size: 0.95rem !important;
+      }
+
+      .data-table th {
+        font-size: 0.88rem !important;
+        padding: 14px 12px !important;
+      }
+
+      .data-table td {
+        font-size: 0.98rem !important;
+        padding: 14px 12px !important;
+      }
+
+      .data-table .form-control {
+        font-size: 1rem !important;
+        min-height: 44px;
+      }
+
+      .data-table .btn-sm {
+        padding: 8px 12px !important;
+        font-size: 0.82rem !important;
+        min-height: 38px;
+      }
     }
   `]
 })

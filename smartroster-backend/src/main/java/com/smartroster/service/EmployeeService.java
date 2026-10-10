@@ -31,12 +31,41 @@ public class EmployeeService {
     }
 
     public List<EmployeeDTO> getAllActiveEmployees() {
+        return getAllActiveEmployees(null);
+    }
+
+    public List<EmployeeDTO> getAllActiveEmployees(Long managerId) {
+        if (managerId != null) {
+            List<Employee> list = employeeRepository.findByManagerIdAndActiveTrueOrderByNameAsc(managerId);
+            if (list.isEmpty()) {
+                // If this manager has no private employees yet, check unassigned legacy employees
+                List<Employee> unassigned = employeeRepository.findByManagerIdIsNullAndActiveTrueOrderByNameAsc();
+                if (!unassigned.isEmpty()) {
+                    return unassigned.stream().map(this::toDTO).collect(Collectors.toList());
+                }
+            }
+            return list.stream().map(this::toDTO).collect(Collectors.toList());
+        }
         return employeeRepository.findByActiveTrueOrderByNameAsc().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
 
     public List<EmployeeDTO> getAllEmployees() {
+        return getAllEmployees(null);
+    }
+
+    public List<EmployeeDTO> getAllEmployees(Long managerId) {
+        if (managerId != null) {
+            List<Employee> list = employeeRepository.findByManagerIdOrderByNameAsc(managerId);
+            if (list.isEmpty()) {
+                List<Employee> unassigned = employeeRepository.findByManagerIdIsNullAndActiveTrueOrderByNameAsc();
+                if (!unassigned.isEmpty()) {
+                    return unassigned.stream().map(this::toDTO).collect(Collectors.toList());
+                }
+            }
+            return list.stream().map(this::toDTO).collect(Collectors.toList());
+        }
         return employeeRepository.findAll().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
@@ -48,16 +77,28 @@ public class EmployeeService {
 
     @Transactional
     public EmployeeDTO createEmployee(EmployeeDTO dto) {
+        return createEmployee(dto, null, null);
+    }
+
+    @Transactional
+    public EmployeeDTO createEmployee(EmployeeDTO dto, Long managerId, String managerName) {
         String trimmed = dto.getName().trim();
         if (trimmed.isEmpty()) {
             throw new BusinessException("Employee name cannot be empty");
         }
         Employee employee = new Employee(trimmed);
+        employee.setManagerId(managerId != null ? managerId : dto.getManagerId());
+        employee.setManagerName(managerName != null ? managerName : dto.getManagerName());
         return toDTO(employeeRepository.save(employee));
     }
 
     @Transactional
     public List<EmployeeDTO> bulkCreateEmployees(BulkEmployeeRequest request) {
+        return bulkCreateEmployees(request, null, null);
+    }
+
+    @Transactional
+    public List<EmployeeDTO> bulkCreateEmployees(BulkEmployeeRequest request, Long managerId, String managerName) {
         if (request.getNames() == null || request.getNames().isEmpty()) {
             throw new BusinessException("No employee names provided");
         }
@@ -66,7 +107,7 @@ public class EmployeeService {
         for (String name : request.getNames()) {
             String trimmed = name.trim();
             if (!trimmed.isEmpty()) {
-                Employee employee = new Employee(trimmed);
+                Employee employee = new Employee(trimmed, managerId, managerName);
                 created.add(toDTO(employeeRepository.save(employee)));
             }
         }
@@ -89,6 +130,10 @@ public class EmployeeService {
         if (dto.getActive() != null) {
             employee.setActive(dto.getActive());
         }
+        if (dto.getManagerId() != null) {
+            employee.setManagerId(dto.getManagerId());
+            employee.setManagerName(dto.getManagerName());
+        }
         return toDTO(employeeRepository.save(employee));
     }
 
@@ -101,41 +146,57 @@ public class EmployeeService {
 
     @Transactional
     public List<EmployeeDTO> importFromFile(MultipartFile file) {
-        String filename = file.getOriginalFilename();
-        if (filename == null) {
-            throw new BusinessException("File name is missing");
+        return importFromFile(file, null, null);
+    }
+
+    @Transactional
+    public List<EmployeeDTO> importFromFile(MultipartFile file, Long managerId, String managerName) {
+        if (file.isEmpty()) {
+            throw new BusinessException("Uploaded file is empty");
         }
 
-        List<String> names = new ArrayList<>();
+        String filename = file.getOriginalFilename();
+        if (filename == null) {
+            throw new BusinessException("Invalid file name");
+        }
 
+        List<String> names;
         try {
-            if (filename.endsWith(".csv") || filename.endsWith(".txt")) {
+            if (filename.endsWith(".csv")) {
                 names = parseCSV(file);
             } else if (filename.endsWith(".xlsx") || filename.endsWith(".xls")) {
                 names = parseExcel(file);
             } else {
-                throw new BusinessException("Unsupported file format. Use CSV, TXT, or Excel files.");
+                throw new BusinessException("Unsupported file format. Please upload CSV or Excel (.xlsx/.xls)");
             }
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            throw new BusinessException("Error reading file: " + e.getMessage());
+            throw new BusinessException("Failed to parse file: " + e.getMessage());
         }
 
         if (names.isEmpty()) {
-            throw new BusinessException("No employee names found in the file");
+            throw new BusinessException("No employee names found in the uploaded file");
         }
 
-        List<EmployeeDTO> created = new ArrayList<>();
-        for (String name : names) {
-            String trimmed = name.trim();
-            if (!trimmed.isEmpty()) {
-                Employee employee = new Employee(trimmed);
-                created.add(toDTO(employeeRepository.save(employee)));
-            }
-        }
+        BulkEmployeeRequest bulkRequest = new BulkEmployeeRequest();
+        bulkRequest.setNames(names);
+        return bulkCreateEmployees(bulkRequest, managerId, managerName);
+    }
 
-        return created;
+    @Transactional
+    public List<EmployeeDTO> seedStarterTeam(Long managerId, String managerName) {
+        String[] starterNames = {
+                "Rahul Sharma", "Priya Patel", "Amit Kumar", "Sneha Gupta",
+                "Vikram Singh", "Neha Joshi", "Arjun Reddy", "Kavita Nair",
+                "Rajesh Verma", "Meera Iyer", "Suresh Menon", "Deepa Krishnan"
+        };
+        List<EmployeeDTO> result = new ArrayList<>();
+        for (String name : starterNames) {
+            Employee emp = new Employee(name, managerId, managerName);
+            result.add(toDTO(employeeRepository.save(emp)));
+        }
+        return result;
     }
 
     private List<String> parseCSV(MultipartFile file) throws Exception {
@@ -182,6 +243,6 @@ public class EmployeeService {
     }
 
     private EmployeeDTO toDTO(Employee e) {
-        return new EmployeeDTO(e.getId(), e.getName(), e.getActive());
+        return new EmployeeDTO(e.getId(), e.getName(), e.getActive(), e.getManagerId(), e.getManagerName());
     }
 }

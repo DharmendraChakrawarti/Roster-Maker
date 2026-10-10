@@ -17,6 +17,12 @@ public class Employee {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @Column(name = "manager_id")
+    private Long managerId;
+
+    @Column(name = "manager_name")
+    private String managerName;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -28,6 +34,13 @@ public class Employee {
     public Employee(String name) {
         this.name = name;
         this.active = true;
+    }
+
+    public Employee(String name, Long managerId, String managerName) {
+        this.name = name;
+        this.active = true;
+        this.managerId = managerId;
+        this.managerName = managerName;
     }
 
     @PreUpdate
@@ -44,6 +57,12 @@ public class Employee {
 
     public Boolean getActive() { return active; }
     public void setActive(Boolean active) { this.active = active; }
+
+    public Long getManagerId() { return managerId; }
+    public void setManagerId(Long managerId) { this.managerId = managerId; }
+
+    public String getManagerName() { return managerName; }
+    public void setManagerName(String managerName) { this.managerName = managerName; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

@@ -32,6 +32,12 @@ public class User {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @Column(name = "manager_id")
+    private Long managerId;
+
+    @Column(name = "manager_name")
+    private String managerName;
+
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
@@ -51,6 +57,18 @@ public class User {
         this.fullName = fullName;
         this.department = department;
         this.active = true;
+    }
+
+    public User(String username, String email, String passwordHash, String role, String fullName, String department, Long managerId, String managerName) {
+        this.username = username;
+        this.email = email;
+        this.passwordHash = passwordHash;
+        this.role = role;
+        this.fullName = fullName;
+        this.department = department;
+        this.active = true;
+        this.managerId = managerId;
+        this.managerName = managerName;
     }
 
     @PreUpdate
@@ -87,6 +105,12 @@ public class User {
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
+
+    public Long getManagerId() { return managerId; }
+    public void setManagerId(Long managerId) { this.managerId = managerId; }
+
+    public String getManagerName() { return managerName; }
+    public void setManagerName(String managerName) { this.managerName = managerName; }
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }

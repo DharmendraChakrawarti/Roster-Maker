@@ -35,6 +35,25 @@ export class AuthService {
     return !!user && user.role === 'ADMIN';
   }
 
+  public get isManager(): boolean {
+    const user = this.currentUser;
+    return !!user && user.role === 'MANAGER';
+  }
+
+  public get isStaff(): boolean {
+    const user = this.currentUser;
+    return !!user && user.role === 'USER';
+  }
+
+  public get canManageRoster(): boolean {
+    const user = this.currentUser;
+    return !!user && (user.role === 'ADMIN' || user.role === 'MANAGER');
+  }
+
+  getManagers(): Observable<import('../models/auth.models').ManagerSummary[]> {
+    return this.http.get<import('../models/auth.models').ManagerSummary[]>(`${this.apiUrl}/managers`);
+  }
+
   login(username: string, password: string): Observable<AuthResponse> {
     return this.http.post<AuthResponse>(`${this.apiUrl}/login`, { username, password }).pipe(
       tap((res) => {

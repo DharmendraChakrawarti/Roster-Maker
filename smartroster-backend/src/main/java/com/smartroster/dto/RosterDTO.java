@@ -10,6 +10,8 @@ public class RosterDTO {
     private Integer year;
     private String status;
     private Integer weeklyOffPerEmployee;
+    private Long managerId;
+    private String managerName;
     private List<RosterAssignmentDTO> assignments;
     private List<String> warnings;
     private Map<String, EmployeeShiftSummary> employeeSummary;
@@ -27,6 +29,10 @@ public class RosterDTO {
     public void setStatus(String status) { this.status = status; }
     public Integer getWeeklyOffPerEmployee() { return weeklyOffPerEmployee; }
     public void setWeeklyOffPerEmployee(Integer weeklyOffPerEmployee) { this.weeklyOffPerEmployee = weeklyOffPerEmployee; }
+    public Long getManagerId() { return managerId; }
+    public void setManagerId(Long managerId) { this.managerId = managerId; }
+    public String getManagerName() { return managerName; }
+    public void setManagerName(String managerName) { this.managerName = managerName; }
     public List<RosterAssignmentDTO> getAssignments() { return assignments; }
     public void setAssignments(List<RosterAssignmentDTO> assignments) { this.assignments = assignments; }
     public List<String> getWarnings() { return warnings; }

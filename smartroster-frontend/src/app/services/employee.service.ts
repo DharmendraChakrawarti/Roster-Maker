@@ -42,4 +42,8 @@ export class EmployeeService {
   deleteEmployee(id: number): Observable<void> {
     return this.http.delete<void>(`${this.apiUrl}/${id}`);
   }
+
+  seedStarterTeam(): Observable<Employee[]> {
+    return this.http.post<Employee[]>(`${this.apiUrl}/seed-starter-team`, {});
+  }
 }

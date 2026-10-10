@@ -1,6 +1,8 @@
 package com.smartroster.controller;
 
 import com.smartroster.dto.ShiftConfigDTO;
+import com.smartroster.entity.User;
+import com.smartroster.security.AuthHelper;
 import com.smartroster.service.ShiftConfigService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -14,9 +16,11 @@ import java.util.List;
 public class ShiftConfigController {
 
     private final ShiftConfigService shiftConfigService;
+    private final AuthHelper authHelper;
 
-    public ShiftConfigController(ShiftConfigService shiftConfigService) {
+    public ShiftConfigController(ShiftConfigService shiftConfigService, AuthHelper authHelper) {
         this.shiftConfigService = shiftConfigService;
+        this.authHelper = authHelper;
     }
 
     @GetMapping
@@ -33,18 +37,30 @@ public class ShiftConfigController {
     }
 
     @PostMapping
-    public ResponseEntity<ShiftConfigDTO> createShiftConfig(@Valid @RequestBody ShiftConfigDTO dto) {
+    public ResponseEntity<ShiftConfigDTO> createShiftConfig(
+            @Valid @RequestBody ShiftConfigDTO dto,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        User user = authHelper.resolveUser(authHeader);
+        authHelper.requireManagerOrAdmin(user);
         return ResponseEntity.status(HttpStatus.CREATED).body(shiftConfigService.createShiftConfig(dto));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ShiftConfigDTO> updateShiftConfig(@PathVariable Long id,
-                                                            @Valid @RequestBody ShiftConfigDTO dto) {
+    public ResponseEntity<ShiftConfigDTO> updateShiftConfig(
+            @PathVariable Long id,
+            @Valid @RequestBody ShiftConfigDTO dto,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        User user = authHelper.resolveUser(authHeader);
+        authHelper.requireManagerOrAdmin(user);
         return ResponseEntity.ok(shiftConfigService.updateShiftConfig(id, dto));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteShiftConfig(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteShiftConfig(
+            @PathVariable Long id,
+            @RequestHeader(value = "Authorization", required = false) String authHeader) {
+        User user = authHelper.resolveUser(authHeader);
+        authHelper.requireManagerOrAdmin(user);
         shiftConfigService.deleteShiftConfig(id);
         return ResponseEntity.noContent().build();
     }

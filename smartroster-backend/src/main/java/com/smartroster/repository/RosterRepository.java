@@ -9,5 +9,8 @@ import java.util.List;
 @Repository
 public interface RosterRepository extends JpaRepository<Roster, Long> {
     Optional<Roster> findByMonthAndYear(Integer month, Integer year);
+    Optional<Roster> findByMonthAndYearAndManagerId(Integer month, Integer year, Long managerId);
+    List<Roster> findByManagerIdOrderByYearDescMonthDesc(Long managerId);
+    List<Roster> findAllByManagerIdAndYearLessThanEqualOrderByYearAscMonthAsc(Long managerId, Integer year);
     List<Roster> findAllByOrderByYearDescMonthDesc();
 }

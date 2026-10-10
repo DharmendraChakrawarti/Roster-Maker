@@ -29,6 +29,9 @@ public class ShiftConfig {
     @Column(nullable = false)
     private Boolean active = true;
 
+    @Column(name = "manager_id")
+    private Long managerId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
@@ -42,9 +45,21 @@ public class ShiftConfig {
         this.active = true;
     }
 
+    public ShiftConfig(String shiftName, Integer weekdayCount, Integer weekendCount, String colorCode, Long managerId) {
+        this.shiftName = shiftName;
+        this.weekdayCount = weekdayCount;
+        this.weekendCount = weekendCount;
+        this.colorCode = colorCode;
+        this.active = true;
+        this.managerId = managerId;
+    }
+
     // Getters and Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
+    public Long getManagerId() { return managerId; }
+    public void setManagerId(Long managerId) { this.managerId = managerId; }
 
     public String getShiftName() { return shiftName; }
     public void setShiftName(String shiftName) { this.shiftName = shiftName; }

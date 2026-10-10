@@ -1,10 +1,13 @@
 package com.smartroster.service;
 
 import com.smartroster.dto.*;
+import com.smartroster.entity.Employee;
+import com.smartroster.entity.Roster;
 import com.smartroster.entity.User;
 import com.smartroster.exception.BusinessException;
 import com.smartroster.exception.ResourceNotFoundException;
 import com.smartroster.repository.EmployeeRepository;
+import com.smartroster.repository.RosterRepository;
 import com.smartroster.repository.UserRepository;
 import com.smartroster.security.SecurityUtils;
 import jakarta.annotation.PostConstruct;
@@ -21,15 +24,20 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final EmployeeRepository employeeRepository;
+    private final RosterRepository rosterRepository;
 
-    public UserService(UserRepository userRepository, EmployeeRepository employeeRepository) {
+    public UserService(UserRepository userRepository,
+                       EmployeeRepository employeeRepository,
+                       RosterRepository rosterRepository) {
         this.userRepository = userRepository;
         this.employeeRepository = employeeRepository;
+        this.rosterRepository = rosterRepository;
     }
 
     @PostConstruct
     @Transactional
     public void initDefaultUsers() {
+        User manager;
         if (userRepository.count() == 0) {
             // Seed Admin DC
             User dc = new User(
@@ -54,7 +62,7 @@ public class UserService {
             userRepository.save(admin);
 
             // Seed Shift Manager
-            User manager = new User(
+            manager = new User(
                     "manager",
                     "manager@smartroster.io",
                     SecurityUtils.hashPassword("manager123"),
@@ -62,16 +70,18 @@ public class UserService {
                     "Shift Operations Manager",
                     "Operations"
             );
-            userRepository.save(manager);
+            manager = userRepository.save(manager);
 
-            // Seed Standard User
+            // Seed Staff Users reporting directly to Shift Manager
             User rahul = new User(
                     "rahul",
                     "rahul@smartroster.io",
                     SecurityUtils.hashPassword("user123"),
                     "USER",
                     "Rahul Sharma",
-                    "Support & Operations"
+                    "Support & Operations",
+                    manager.getId(),
+                    manager.getFullName()
             );
             userRepository.save(rahul);
 
@@ -81,10 +91,42 @@ public class UserService {
                     SecurityUtils.hashPassword("user123"),
                     "USER",
                     "Priya Patel",
-                    "Logistics"
+                    "Logistics",
+                    manager.getId(),
+                    manager.getFullName()
             );
             userRepository.save(priya);
+        } else {
+            // Link existing manager if available
+            Optional<User> mgrOpt = userRepository.findByUsernameIgnoreCase("manager");
+            manager = mgrOpt.orElse(null);
         }
+
+        // Ensure existing unassigned employees & rosters belong to the default manager
+        if (manager != null) {
+            List<Employee> unassignedEmps = employeeRepository.findByManagerIdIsNullAndActiveTrueOrderByNameAsc();
+            for (Employee emp : unassignedEmps) {
+                emp.setManagerId(manager.getId());
+                emp.setManagerName(manager.getFullName());
+                employeeRepository.save(emp);
+            }
+
+            List<Roster> rosters = rosterRepository.findAll();
+            for (Roster r : rosters) {
+                if (r.getManagerId() == null) {
+                    r.setManagerId(manager.getId());
+                    r.setManagerName(manager.getFullName());
+                    rosterRepository.save(r);
+                }
+            }
+        }
+    }
+
+    public List<ManagerSummaryDTO> getActiveManagers() {
+        List<User> managers = userRepository.findByRoleAndActiveTrueOrderByFullNameAsc("MANAGER");
+        return managers.stream()
+                .map(ManagerSummaryDTO::fromUser)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -130,16 +172,45 @@ public class UserService {
         String role = (request.getRole() != null && !request.getRole().isBlank())
                 ? request.getRole().toUpperCase() : "USER";
 
+        Long managerId = null;
+        String managerName = null;
+
+        if ("USER".equalsIgnoreCase(role)) {
+            // Staff user must report to a manager
+            if (request.getManagerId() != null) {
+                Optional<User> mgrOpt = userRepository.findById(request.getManagerId());
+                if (mgrOpt.isPresent()) {
+                    managerId = mgrOpt.get().getId();
+                    managerName = mgrOpt.get().getFullName();
+                }
+            }
+            if (managerId == null) {
+                // Fallback to default manager
+                Optional<User> defaultMgr = userRepository.findByUsernameIgnoreCase("manager");
+                if (defaultMgr.isPresent()) {
+                    managerId = defaultMgr.get().getId();
+                    managerName = defaultMgr.get().getFullName();
+                }
+            }
+        }
+
         User user = new User(
                 username,
                 email,
                 SecurityUtils.hashPassword(request.getPassword()),
                 role,
                 request.getFullName(),
-                request.getDepartment() != null ? request.getDepartment() : "Operations"
+                request.getDepartment() != null ? request.getDepartment() : "Operations",
+                managerId,
+                managerName
         );
         user.setLastLoginAt(LocalDateTime.now());
         user = userRepository.save(user);
+
+        // If newly registered user is a MANAGER, seed starter team so they can instantly generate rosters
+        if ("MANAGER".equalsIgnoreCase(role)) {
+            seedStarterEmployees(user.getId(), user.getFullName());
+        }
 
         String token = SecurityUtils.generateToken(user.getId(), user.getUsername(), user.getRole());
         return new AuthResponse(token, UserDTO.fromEntity(user), "Account created successfully.");
@@ -191,16 +262,35 @@ public class UserService {
 
         String role = request.getRole() != null ? request.getRole().toUpperCase() : "USER";
 
+        Long managerId = null;
+        String managerName = null;
+        if ("USER".equalsIgnoreCase(role)) {
+            if (request.getManagerId() != null) {
+                Optional<User> mgr = userRepository.findById(request.getManagerId());
+                if (mgr.isPresent()) {
+                    managerId = mgr.get().getId();
+                    managerName = mgr.get().getFullName();
+                }
+            }
+        }
+
         User user = new User(
                 username,
                 email,
                 SecurityUtils.hashPassword(request.getPassword()),
                 role,
                 request.getFullName(),
-                request.getDepartment() != null ? request.getDepartment() : "Operations"
+                request.getDepartment() != null ? request.getDepartment() : "Operations",
+                managerId,
+                managerName
         );
 
         user = userRepository.save(user);
+
+        if ("MANAGER".equalsIgnoreCase(role)) {
+            seedStarterEmployees(user.getId(), user.getFullName());
+        }
+
         return UserDTO.fromEntity(user);
     }
 
@@ -235,6 +325,18 @@ public class UserService {
                 }
             }
             user.setRole(newRole);
+            if (!"USER".equals(newRole)) {
+                user.setManagerId(null);
+                user.setManagerName(null);
+            }
+        }
+
+        if (request.getManagerId() != null && "USER".equals(user.getRole())) {
+            Optional<User> mgrOpt = userRepository.findById(request.getManagerId());
+            if (mgrOpt.isPresent()) {
+                user.setManagerId(mgrOpt.get().getId());
+                user.setManagerName(mgrOpt.get().getFullName());
+            }
         }
 
         if (request.getActive() != null) {
@@ -261,37 +363,6 @@ public class UserService {
     }
 
     @Transactional
-    public UserDTO toggleUserStatus(Long id) {
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-
-        boolean newStatus = !Boolean.TRUE.equals(user.getActive());
-        if (!newStatus && "ADMIN".equals(user.getRole())) {
-            long activeAdmins = userRepository.findAll().stream()
-                    .filter(u -> "ADMIN".equals(u.getRole()) && Boolean.TRUE.equals(u.getActive()) && !u.getId().equals(id))
-                    .count();
-            if (activeAdmins == 0) {
-                throw new BusinessException("Cannot deactivate the only active system administrator.");
-            }
-        }
-
-        user.setActive(newStatus);
-        user = userRepository.save(user);
-        return UserDTO.fromEntity(user);
-    }
-
-    @Transactional
-    public void resetPassword(Long id, String newPassword) {
-        if (newPassword == null || newPassword.length() < 6) {
-            throw new BusinessException("Password must be at least 6 characters.");
-        }
-        User user = userRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        user.setPasswordHash(SecurityUtils.hashPassword(newPassword));
-        userRepository.save(user);
-    }
-
-    @Transactional
     public void deleteUser(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
@@ -306,6 +377,36 @@ public class UserService {
         userRepository.delete(user);
     }
 
+    @Transactional
+    public UserDTO toggleUserStatus(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+
+        if ("ADMIN".equals(user.getRole()) && Boolean.TRUE.equals(user.getActive())) {
+            long activeAdmins = userRepository.findAll().stream()
+                    .filter(u -> "ADMIN".equals(u.getRole()) && Boolean.TRUE.equals(u.getActive()) && !u.getId().equals(id))
+                    .count();
+            if (activeAdmins == 0) {
+                throw new BusinessException("Cannot deactivate the only active system administrator.");
+            }
+        }
+
+        user.setActive(!Boolean.TRUE.equals(user.getActive()));
+        user = userRepository.save(user);
+        return UserDTO.fromEntity(user);
+    }
+
+    @Transactional
+    public void resetPassword(Long id, String newPassword) {
+        if (newPassword == null || newPassword.length() < 6) {
+            throw new BusinessException("New password must be at least 6 characters.");
+        }
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
+        user.setPasswordHash(SecurityUtils.hashPassword(newPassword));
+        userRepository.save(user);
+    }
+
     public AdminStatsDTO getAdminStats() {
         AdminStatsDTO stats = new AdminStatsDTO();
         stats.setTotalUsers(userRepository.count());
@@ -315,5 +416,19 @@ public class UserService {
         stats.setUserCount(userRepository.countByRole("USER"));
         stats.setActiveEmployeesCount(employeeRepository.countByActiveTrue());
         return stats;
+    }
+
+    private void seedStarterEmployees(Long managerId, String managerName) {
+        if (employeeRepository.countByManagerId(managerId) == 0) {
+            String[] starterNames = {
+                    "Rahul Sharma", "Priya Patel", "Amit Kumar", "Sneha Gupta",
+                    "Vikram Singh", "Neha Joshi", "Arjun Reddy", "Kavita Nair",
+                    "Rajesh Verma", "Meera Iyer", "Suresh Menon", "Deepa Krishnan"
+            };
+            for (String name : starterNames) {
+                Employee emp = new Employee(name, managerId, managerName);
+                employeeRepository.save(emp);
+            }
+        }
     }
 }

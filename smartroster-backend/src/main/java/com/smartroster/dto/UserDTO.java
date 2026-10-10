@@ -11,6 +11,8 @@ public class UserDTO {
     private String fullName;
     private String department;
     private Boolean active;
+    private Long managerId;
+    private String managerName;
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
 
@@ -25,6 +27,8 @@ public class UserDTO {
         dto.setFullName(user.getFullName());
         dto.setDepartment(user.getDepartment());
         dto.setActive(user.getActive());
+        dto.setManagerId(user.getManagerId());
+        dto.setManagerName(user.getManagerName());
         dto.setLastLoginAt(user.getLastLoginAt());
         dto.setCreatedAt(user.getCreatedAt());
         return dto;
@@ -50,6 +54,12 @@ public class UserDTO {
 
     public Boolean getActive() { return active; }
     public void setActive(Boolean active) { this.active = active; }
+
+    public Long getManagerId() { return managerId; }
+    public void setManagerId(Long managerId) { this.managerId = managerId; }
+
+    public String getManagerName() { return managerName; }
+    public void setManagerName(String managerName) { this.managerName = managerName; }
 
     public LocalDateTime getLastLoginAt() { return lastLoginAt; }
     public void setLastLoginAt(LocalDateTime lastLoginAt) { this.lastLoginAt = lastLoginAt; }

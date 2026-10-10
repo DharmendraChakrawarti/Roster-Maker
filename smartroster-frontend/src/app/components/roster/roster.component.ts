@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { RosterService } from '../../services/roster.service';
 import { ShiftConfigService } from '../../services/shift-config.service';
 import { EmployeeService } from '../../services/employee.service';
+import { AuthService } from '../../services/auth.service';
+import { ManagerSummary } from '../../models/auth.models';
 import {
   Roster,
   RosterAssignment,
@@ -31,8 +33,10 @@ interface DayColumn {
     <div class="page-container">
       <div class="page-header">
         <div>
-          <h1>Shift Roster Management</h1>
-          <p class="text-secondary subtitle">Generate, customize, and analyze monthly shift rosters with automated fairness rules</p>
+          <h1>{{ isStaff ? 'My Shift Schedule' : 'Shift Roster Management' }}</h1>
+          <p class="text-secondary subtitle">
+            {{ isStaff ? 'View and export shift schedules published by your operations manager' : 'Generate, customize, and analyze monthly shift rosters with automated fairness rules' }}
+          </p>
         </div>
         <div class="page-actions">
           <button class="btn btn-secondary" (click)="loadAllRosters()" title="Refresh Roster Data">
@@ -43,14 +47,67 @@ interface DayColumn {
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
             Export Excel
           </button>
-          <button *ngIf="currentRoster && currentRoster.id && currentRoster.status !== 'FINALIZED'" class="btn btn-accent" (click)="finalizeCurrentRoster()" [disabled]="loading">
+          <button *ngIf="canEdit && currentRoster && currentRoster.id && currentRoster.status !== 'FINALIZED'" class="btn btn-accent" (click)="finalizeCurrentRoster()" [disabled]="loading">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
             Finalize Roster
           </button>
-          <button *ngIf="currentRoster && currentRoster.id" class="btn btn-danger" (click)="deleteCurrentRoster()" [disabled]="loading">
+          <button *ngIf="canEdit && currentRoster && currentRoster.id" class="btn btn-danger" (click)="deleteCurrentRoster()" [disabled]="loading">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
             Delete
           </button>
+        </div>
+      </div>
+
+      <!-- Manager Scope & Ownership Context Banner -->
+      <div class="card mb-3 manager-scope-banner">
+        <div class="manager-scope-content">
+          <div class="manager-scope-icon" [class.staff-icon]="isStaff" [class.manager-icon]="isManager" [class.admin-icon]="isAdmin">
+            <svg *ngIf="isManager" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+            </svg>
+            <svg *ngIf="isStaff" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+              <circle cx="12" cy="12" r="3"></circle>
+            </svg>
+            <svg *ngIf="isAdmin" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+          </div>
+
+          <div class="manager-scope-text">
+            <div class="scope-header-line">
+              <span class="scope-title">
+                {{ isStaff ? 'Team Roster Schedule' : (isManager ? 'Private Manager Workspace' : 'Administrator Roster Console') }}
+              </span>
+              <span class="scope-badge" [class.badge-staff]="isStaff" [class.badge-manager]="isManager" [class.badge-admin]="isAdmin">
+                {{ isStaff ? 'Staff Schedule View' : (isManager ? 'Full Manager Control' : 'Administrator') }}
+              </span>
+            </div>
+
+            <div class="scope-subtitle-line">
+              <span *ngIf="isStaff">
+                Managed by: <strong>{{ currentRoster?.managerName || authService.currentUser?.managerName || 'Shift Operations Manager' }}</strong>
+                — Viewing published shift schedules. Schedule edits and generation are managed by your team lead.
+              </span>
+              <span *ngIf="isManager">
+                Manager: <strong>{{ authService.currentUser?.fullName }}</strong> ({{ authService.currentUser?.department || 'Operations' }})
+                — All rosters, staff quotas, and historical cycles are private to your management account.
+              </span>
+              <span *ngIf="isAdmin">
+                System Administrator View: Managing private manager rosters across departments.
+              </span>
+            </div>
+          </div>
+
+          <!-- Admin Manager Switcher -->
+          <div *ngIf="isAdmin && adminManagers.length > 0" class="admin-manager-picker">
+            <label class="picker-label">Switch Manager View:</label>
+            <select class="form-control select-picker" [(ngModel)]="selectedAdminManagerId" (change)="onAdminManagerChange()">
+              <option [ngValue]="null">All Managers</option>
+              <option *ngFor="let m of adminManagers" [ngValue]="m.id">{{ m.fullName }} ({{ m.username }})</option>
+            </select>
+          </div>
         </div>
       </div>
 
@@ -83,7 +140,7 @@ interface DayColumn {
             </select>
           </div>
 
-          <div class="control-group">
+          <div class="control-group" *ngIf="!isStaff">
             <label class="control-label">Weekly Rest Days</label>
             <select class="form-control select-control" [(ngModel)]="weeklyOffPerEmployee">
               <option [ngValue]="2">2 Days / Week</option>
@@ -92,16 +149,16 @@ interface DayColumn {
           </div>
 
           <div class="control-group quick-actions-group">
-            <label class="control-label">Operations</label>
+            <label class="control-label">{{ isStaff ? 'Schedule Action' : 'Operations' }}</label>
             <div class="quick-btns">
-              <button class="btn btn-primary" (click)="generateRoster()" [disabled]="loading">
+              <button *ngIf="canEdit" class="btn btn-primary" (click)="generateRoster()" [disabled]="loading">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
                 <span *ngIf="!loading">Generate Roster</span>
                 <span *ngIf="loading">Generating...</span>
               </button>
               <button class="btn btn-secondary" (click)="loadRosterForMonth(selectedMonth, selectedYear)" [disabled]="loading">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                Load Saved
+                Load Schedule
               </button>
             </div>
           </div>
@@ -125,8 +182,8 @@ interface DayColumn {
         </div>
       </div>
 
-      <!-- Pre-Generation Historical Continuity & Cadence Inspection Panel -->
-      <div *ngIf="continuityContext" class="card mb-3 continuity-card">
+      <!-- Pre-Generation Historical Continuity & Cadence Inspection Panel (Managers & Admin Only) -->
+      <div *ngIf="!isStaff && continuityContext" class="card mb-3 continuity-card">
         <div class="continuity-header">
           <div class="continuity-title">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
@@ -181,15 +238,30 @@ interface DayColumn {
         </div>
       </div>
 
-      <!-- Warnings Banner -->
+      <!-- Warnings Banner (Collapsible Dropdown) -->
       <div *ngIf="currentRoster && currentRoster.warnings && currentRoster.warnings.length > 0" class="warnings-banner card mb-3">
-        <div class="warning-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
-          <strong>Roster Optimization Notices ({{ currentRoster.warnings.length }})</strong>
+        <div class="warning-toggle-header" (click)="warningsExpanded = !warningsExpanded">
+          <div class="warning-title-left">
+            <svg class="warn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+              <line x1="12" y1="9" x2="12" y2="13"></line>
+              <line x1="12" y1="17" x2="12.01" y2="17"></line>
+            </svg>
+            <strong>Roster Optimization Notices ({{ currentRoster.warnings.length }})</strong>
+            <span class="warning-toggle-pill">{{ warningsExpanded ? 'Hide Notices' : 'Show Notices' }}</span>
+          </div>
+          <div class="warning-chevron" [class.rotated]="warningsExpanded">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+          </div>
         </div>
-        <ul class="warning-list">
-          <li *ngFor="let w of currentRoster.warnings">{{ w }}</li>
-        </ul>
+
+        <div *ngIf="warningsExpanded" class="warning-dropdown-body">
+          <ul class="warning-list">
+            <li *ngFor="let w of currentRoster.warnings">{{ w }}</li>
+          </ul>
+        </div>
       </div>
 
       <!-- Loading State -->
@@ -203,9 +275,12 @@ interface DayColumn {
         <div class="empty-icon-box">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
         </div>
-        <h3>No Roster Selected</h3>
-        <p class="text-secondary">Select a target month and year above to generate an automated fair schedule, or load an existing roster from history.</p>
-        <button class="btn btn-primary" (click)="generateRoster()">
+        <h3>{{ isStaff ? 'No Schedule Published Yet' : 'No Roster Selected' }}</h3>
+        <p class="text-secondary">
+          <span *ngIf="!isStaff">Select a target month and year above to generate an automated fair schedule, or load an existing roster from history.</span>
+          <span *ngIf="isStaff">No shift roster has been published for {{ getMonthName(selectedMonth) }} {{ selectedYear }}. Please contact your operations manager ({{ authService.currentUser?.managerName || 'Lead Manager' }}).</span>
+        </p>
+        <button *ngIf="canEdit" class="btn btn-primary" (click)="generateRoster()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
           Generate for {{ getMonthName(selectedMonth) }} {{ selectedYear }}
         </button>
@@ -269,12 +344,18 @@ interface DayColumn {
                 </div>
               </div>
             </div>
-            <div class="legend-tip">
+            <div class="legend-tip" *ngIf="canEdit">
               Click any schedule cell to edit shift or mark day off
+            </div>
+            <div class="legend-tip text-muted" *ngIf="!canEdit">
+              Staff Read-Only View • Schedule modifications restricted to Shift Operations Manager
             </div>
           </div>
 
           <!-- Calendar Matrix Table -->
+          <div class="mobile-swipe-indicator">
+            👈 Swipe horizontally to view full calendar & days 👉
+          </div>
           <div class="matrix-wrapper">
             <table class="roster-matrix">
               <thead>
@@ -303,8 +384,9 @@ interface DayColumn {
                   <td
                     *ngFor="let day of daysInMonth"
                     class="shift-cell"
+                    [class.readonly-cell]="!canEdit"
                     [class.cell-weekend]="day.isWeekend"
-                    (click)="openEditModal(empId, day.dateStr)">
+                    (click)="canEdit ? openEditModal(empId, day.dateStr) : null">
                     <div
                       class="shift-tag"
                       [style.background-color]="getShiftColor(empId, day.dateStr)"
@@ -418,7 +500,7 @@ interface DayColumn {
                 Export Excel
               </button>
             </div>
-            <div class="table-container">
+            <div class="table-responsive">
               <table class="data-table">
                 <thead>
                   <tr>
@@ -459,7 +541,7 @@ interface DayColumn {
             <h3>Daily Staffing Quota vs Actual Coverage</h3>
           </div>
           <p class="text-secondary mb-3">Verification breakdown confirming required weekday and weekend staffing minimums are satisfied for each day of the month.</p>
-          <div class="table-container">
+          <div class="table-responsive">
             <table class="data-table">
               <thead>
                 <tr>
@@ -571,6 +653,135 @@ interface DayColumn {
 
     .alert-close-btn:hover {
       opacity: 1;
+    }
+
+    /* Manager Scope Banner */
+    .manager-scope-banner {
+      padding: 1rem 1.25rem;
+      background: linear-gradient(90deg, rgba(20, 24, 38, 0.95) 0%, rgba(15, 18, 30, 0.95) 100%);
+      border: 1px solid var(--border-color);
+      border-left: 4px solid var(--accent-primary);
+    }
+
+    .manager-scope-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .manager-scope-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      background: rgba(26, 115, 232, 0.15);
+      color: var(--accent-primary-light);
+      border: 1px solid rgba(26, 115, 232, 0.3);
+    }
+
+    .manager-scope-icon.staff-icon {
+      background: rgba(0, 188, 212, 0.15);
+      color: #26c6da;
+      border-color: rgba(0, 188, 212, 0.3);
+    }
+
+    .manager-scope-icon.manager-icon {
+      background: rgba(249, 171, 0, 0.15);
+      color: var(--accent-warning);
+      border-color: rgba(249, 171, 0, 0.3);
+    }
+
+    .manager-scope-icon.admin-icon {
+      background: rgba(156, 39, 176, 0.15);
+      color: #ce93d8;
+      border-color: rgba(156, 39, 176, 0.3);
+    }
+
+    .manager-scope-text {
+      flex: 1;
+      min-width: 250px;
+    }
+
+    .scope-header-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .scope-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-heading);
+    }
+
+    .scope-badge {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    .badge-staff {
+      background: rgba(0, 188, 212, 0.15);
+      color: #26c6da;
+      border: 1px solid rgba(0, 188, 212, 0.35);
+    }
+
+    .badge-manager {
+      background: rgba(249, 171, 0, 0.15);
+      color: var(--accent-warning);
+      border: 1px solid rgba(249, 171, 0, 0.35);
+    }
+
+    .badge-admin {
+      background: rgba(156, 39, 176, 0.15);
+      color: #ce93d8;
+      border: 1px solid rgba(156, 39, 176, 0.35);
+    }
+
+    .scope-subtitle-line {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .admin-manager-picker {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .picker-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .select-picker {
+      min-width: 180px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+    }
+
+    .readonly-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      font-weight: 600;
     }
 
     /* Continuity Card */
@@ -835,31 +1046,87 @@ interface DayColumn {
       border: 1px solid rgba(52, 168, 83, 0.3);
     }
 
-    /* Warnings Banner */
+    /* Warnings Banner Collapsible Dropdown */
     .warnings-banner {
       background: rgba(249, 171, 0, 0.06);
-      border: 1px solid rgba(249, 171, 0, 0.25);
-      padding: 1rem 1.5rem;
+      border: 1px solid rgba(249, 171, 0, 0.28);
+      padding: 0 !important;
+      overflow: hidden;
+      border-radius: var(--radius-lg);
     }
 
-    .warning-title {
+    .warning-toggle-header {
       display: flex;
       align-items: center;
-      gap: 8px;
+      justify-content: space-between;
+      width: 100%;
+      padding: 1rem 1.25rem;
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--transition-fast);
+      gap: 12px;
+    }
+
+    .warning-toggle-header:hover {
+      background: rgba(249, 171, 0, 0.12);
+    }
+
+    .warning-title-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       color: var(--accent-warning);
-      margin-bottom: 0.5rem;
-      font-size: 0.9rem;
+      font-size: 0.95rem;
+      flex-wrap: wrap;
+    }
+
+    .warn-icon {
+      flex-shrink: 0;
+      color: var(--accent-warning);
+    }
+
+    .warning-toggle-pill {
+      font-size: 0.75rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      background: rgba(249, 171, 0, 0.18);
+      color: var(--accent-warning);
+      border: 1px solid rgba(249, 171, 0, 0.35);
+      padding: 3px 9px;
+      border-radius: 12px;
+    }
+
+    .warning-chevron {
+      color: var(--accent-warning);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform var(--transition-fast);
+      flex-shrink: 0;
+    }
+
+    .warning-chevron.rotated {
+      transform: rotate(180deg);
+    }
+
+    .warning-dropdown-body {
+      padding: 0 1.25rem 1.25rem 1.25rem;
+      border-top: 1px solid rgba(249, 171, 0, 0.18);
+      padding-top: 1rem;
+      animation: fadeIn 0.2s ease;
     }
 
     .warning-list {
       margin: 0;
       padding-left: 1.5rem;
       color: var(--text-primary);
-      font-size: 0.85rem;
+      font-size: 0.9rem;
     }
 
     .warning-list li {
-      margin-bottom: 4px;
+      margin-bottom: 6px;
+      line-height: 1.5;
     }
 
     /* Empty state */
@@ -1175,6 +1442,18 @@ interface DayColumn {
       background: rgba(26, 115, 232, 0.15) !important;
     }
 
+    .shift-cell.readonly-cell {
+      cursor: default !important;
+    }
+
+    .shift-cell.readonly-cell:hover {
+      background: inherit !important;
+    }
+
+    .shift-cell.readonly-cell .shift-tag:hover {
+      transform: none !important;
+    }
+
     .cell-weekend {
       background: rgba(255, 255, 255, 0.01);
     }
@@ -1440,6 +1719,301 @@ interface DayColumn {
         grid-template-columns: 1fr;
       }
     }
+
+    @media (max-width: 768px) {
+      .manager-scope-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.85rem;
+      }
+
+      .scope-title {
+        font-size: 1.15rem !important;
+        font-weight: 800;
+      }
+
+      .scope-badge {
+        font-size: 0.82rem !important;
+        padding: 4px 10px !important;
+      }
+
+      .scope-subtitle-line {
+        font-size: 0.92rem !important;
+        line-height: 1.5;
+      }
+
+      .admin-manager-picker {
+        width: 100%;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+      }
+
+      .picker-label {
+        font-size: 0.88rem !important;
+        font-weight: 700;
+      }
+
+      .select-picker {
+        width: 100%;
+        font-size: 1rem !important;
+        min-height: 48px;
+      }
+
+      .roster-controls {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+      }
+
+      .control-group {
+        width: 100%;
+      }
+
+      .control-label {
+        font-size: 0.88rem !important;
+        font-weight: 800 !important;
+        margin-bottom: 6px;
+      }
+
+      .select-control {
+        width: 100% !important;
+        min-width: 100% !important;
+        font-size: 1rem !important;
+        min-height: 48px;
+      }
+
+      .quick-btns {
+        width: 100%;
+        display: flex;
+        gap: 10px;
+      }
+
+      .quick-btns .btn {
+        flex: 1;
+        justify-content: center;
+        font-size: 0.95rem !important;
+        font-weight: 800 !important;
+        min-height: 48px;
+        padding: 12px 14px !important;
+      }
+
+      .saved-rosters {
+        min-width: 100%;
+      }
+
+      .roster-pills {
+        gap: 8px;
+      }
+
+      .roster-pill {
+        padding: 10px 14px !important;
+        font-size: 0.92rem !important;
+        min-height: 44px;
+      }
+
+      .pill-badge {
+        font-size: 0.78rem !important;
+      }
+
+      .continuity-title {
+        font-size: 1.1rem !important;
+      }
+
+      .continuity-summary-msg {
+        font-size: 0.92rem !important;
+      }
+
+      .audit-item {
+        font-size: 0.88rem !important;
+      }
+
+      .view-toolbar {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 1rem !important;
+        padding: 1rem !important;
+      }
+
+      .view-tabs {
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .tab-btn {
+        width: 100%;
+        justify-content: center;
+        padding: 11px 14px !important;
+        font-size: 0.95rem !important;
+        font-weight: 700;
+        min-height: 46px;
+      }
+
+      .toolbar-info {
+        flex-wrap: wrap;
+        width: 100%;
+        gap: 10px;
+        justify-content: space-between;
+        font-size: 0.92rem !important;
+      }
+
+      .filter-wrapper {
+        width: 100% !important;
+        margin-top: 6px;
+      }
+
+      .filter-input {
+        width: 100% !important;
+        font-size: 1rem !important;
+        min-height: 46px;
+      }
+
+      .legend-bar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.85rem;
+      }
+
+      .legend-items {
+        gap: 10px;
+      }
+
+      .legend-item {
+        font-size: 0.88rem !important;
+      }
+
+      .legend-badge {
+        min-width: 32px;
+        height: 26px;
+        font-size: 0.78rem !important;
+      }
+
+      .legend-tip {
+        font-size: 0.88rem !important;
+      }
+
+      .mobile-swipe-indicator {
+        display: block !important;
+        text-align: center;
+        font-size: 0.85rem !important;
+        font-weight: 700;
+        color: var(--accent-primary-light);
+        background: rgba(26, 115, 232, 0.12);
+        border: 1px dashed rgba(26, 115, 232, 0.35);
+        border-radius: var(--radius-sm);
+        padding: 8px 12px;
+        margin-bottom: 10px;
+      }
+
+      .matrix-wrapper {
+        max-height: 65vh;
+        -webkit-overflow-scrolling: touch;
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      .col-emp-header,
+      .sticky-col {
+        position: sticky;
+        left: 0;
+        z-index: 5;
+        min-width: 130px !important;
+        max-width: 130px !important;
+        width: 130px !important;
+        padding: 6px 8px !important;
+      }
+
+      .emp-name-wrapper {
+        gap: 6px;
+      }
+
+      .emp-avatar {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
+      }
+
+      .emp-name {
+        font-size: 0.92rem !important;
+        font-weight: 700;
+        max-width: 85px !important;
+      }
+
+      .day-dow {
+        font-size: 0.72rem !important;
+      }
+
+      .day-num {
+        font-size: 0.95rem !important;
+        font-weight: 800;
+      }
+
+      .shift-cell {
+        min-width: 36px !important;
+        padding: 3px 1px !important;
+      }
+
+      .col-day-header {
+        min-width: 36px !important;
+        padding: 6px 2px !important;
+      }
+
+      .shift-tag {
+        width: 34px !important;
+        height: 28px !important;
+        line-height: 28px !important;
+        font-size: 0.78rem !important;
+        font-weight: 800;
+      }
+
+      .col-summary-val {
+        font-size: 0.95rem !important;
+      }
+
+      .coverage-label {
+        font-size: 0.85rem !important;
+      }
+
+      .coverage-cell {
+        font-size: 0.85rem !important;
+      }
+
+      .fairness-stats-grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.85rem;
+      }
+
+      .f-val {
+        font-size: 2.2rem !important;
+      }
+
+      .f-lbl {
+        font-size: 0.88rem !important;
+        font-weight: 700;
+      }
+
+      .breakdown-item .b-header {
+        font-size: 0.95rem !important;
+      }
+
+      .b-count {
+        font-size: 0.88rem !important;
+      }
+
+      .shift-radio-card {
+        padding: 14px !important;
+      }
+
+      .radio-label strong {
+        font-size: 1.05rem !important;
+      }
+
+      .radio-label small {
+        font-size: 0.82rem !important;
+      }
+    }
   `]
 })
 export class RosterComponent implements OnInit {
@@ -1453,6 +2027,9 @@ export class RosterComponent implements OnInit {
   selectedYear: number = new Date().getFullYear();
   weeklyOffPerEmployee: number = 2;
 
+  adminManagers: ManagerSummary[] = [];
+  selectedAdminManagerId: number | null = null;
+
   months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
@@ -1462,6 +2039,7 @@ export class RosterComponent implements OnInit {
 
   activeTab: 'grid' | 'analytics' | 'daily-coverage' = 'grid';
   employeeFilter: string = '';
+  warningsExpanded = false;
 
   daysInMonth: DayColumn[] = [];
   uniqueEmployeeIds: number[] = [];
@@ -1481,12 +2059,39 @@ export class RosterComponent implements OnInit {
   constructor(
     private rosterService: RosterService,
     private shiftService: ShiftConfigService,
-    private employeeService: EmployeeService
+    private employeeService: EmployeeService,
+    public authService: AuthService
   ) {
     const currentYear = new Date().getFullYear();
     for (let y = currentYear - 2; y <= currentYear + 3; y++) {
       this.years.push(y);
     }
+  }
+
+  get isStaff(): boolean {
+    return this.authService.isStaff;
+  }
+
+  get isManager(): boolean {
+    return this.authService.isManager;
+  }
+
+  get isAdmin(): boolean {
+    return this.authService.isAdmin;
+  }
+
+  get canEdit(): boolean {
+    return this.authService.canManageRoster;
+  }
+
+  get targetManagerId(): number | undefined {
+    if (this.isAdmin) {
+      return this.selectedAdminManagerId ?? undefined;
+    }
+    if (this.isManager) {
+      return this.authService.currentUser?.id;
+    }
+    return this.authService.currentUser?.managerId;
   }
 
   ngOnInit(): void {
@@ -1495,6 +2100,13 @@ export class RosterComponent implements OnInit {
   }
 
   loadInitialData(): void {
+    if (this.isAdmin) {
+      this.authService.getManagers().subscribe({
+        next: (mgrs) => (this.adminManagers = mgrs),
+        error: (err) => console.error('Error loading managers for admin', err)
+      });
+    }
+
     this.shiftService.getShiftConfigs().subscribe({
       next: (shifts: ShiftConfig[]) => (this.shifts = shifts),
       error: (err: any) => console.error('Error loading shifts', err)
@@ -1508,8 +2120,15 @@ export class RosterComponent implements OnInit {
     this.loadAllRosters();
   }
 
+  onAdminManagerChange(): void {
+    this.currentRoster = null;
+    this.loadAllRosters();
+    this.checkContinuityContext();
+    this.loadRosterForMonth(this.selectedMonth, this.selectedYear);
+  }
+
   loadAllRosters(): void {
-    this.rosterService.getAllRosters().subscribe({
+    this.rosterService.getAllRosters(this.targetManagerId).subscribe({
       next: (rosters) => {
         this.allRosters = rosters;
         const found = rosters.find(
@@ -1524,7 +2143,7 @@ export class RosterComponent implements OnInit {
   }
 
   checkContinuityContext(): void {
-    this.rosterService.getContinuityContext(this.selectedMonth, this.selectedYear).subscribe({
+    this.rosterService.getContinuityContext(this.selectedMonth, this.selectedYear, this.targetManagerId).subscribe({
       next: (ctx) => (this.continuityContext = ctx),
       error: (err) => console.error('Error checking continuity context', err)
     });
@@ -1547,7 +2166,7 @@ export class RosterComponent implements OnInit {
   loadRosterForMonth(month: number, year: number): void {
     this.loading = true;
     this.clearMessages();
-    this.rosterService.getRosterByMonth(month, year).subscribe({
+    this.rosterService.getRosterByMonth(month, year, this.targetManagerId).subscribe({
       next: (roster) => {
         this.loading = false;
         if (roster && roster.assignments && roster.assignments.length > 0) {
@@ -1564,6 +2183,11 @@ export class RosterComponent implements OnInit {
   }
 
   generateRoster(): void {
+    if (!this.canEdit) {
+      this.errorMessage = 'Permission denied: Staff accounts have read-only access to rosters.';
+      return;
+    }
+
     this.clearMessages();
 
     const existingRoster = this.allRosters.find(
@@ -1583,7 +2207,8 @@ export class RosterComponent implements OnInit {
     const request: GenerateRosterRequest = {
       month: this.selectedMonth,
       year: this.selectedYear,
-      weeklyOffPerEmployee: this.weeklyOffPerEmployee
+      weeklyOffPerEmployee: this.weeklyOffPerEmployee,
+      managerId: this.targetManagerId
     };
 
     this.rosterService.generateRoster(request).subscribe({

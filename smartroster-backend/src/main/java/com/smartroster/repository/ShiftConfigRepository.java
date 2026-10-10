@@ -8,5 +8,6 @@ import java.util.List;
 @Repository
 public interface ShiftConfigRepository extends JpaRepository<ShiftConfig, Long> {
     List<ShiftConfig> findByActiveTrueOrderByDisplayOrderAsc();
+    List<ShiftConfig> findByManagerIdAndActiveTrueOrderByDisplayOrderAsc(Long managerId);
     boolean existsByShiftNameIgnoreCase(String shiftName);
 }

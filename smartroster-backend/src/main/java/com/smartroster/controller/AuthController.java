@@ -42,6 +42,11 @@ public class AuthController {
         return ResponseEntity.ok(userService.getCurrentUser(token));
     }
 
+    @GetMapping("/managers")
+    public ResponseEntity<java.util.List<com.smartroster.dto.ManagerSummaryDTO>> getActiveManagers() {
+        return ResponseEntity.ok(userService.getActiveManagers());
+    }
+
     @PostMapping("/logout")
     public ResponseEntity<Map<String, String>> logout() {
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));

@@ -25,6 +25,10 @@ public class CreateUserRequest {
 
     private String department = "Operations";
 
+    private Long managerId;
+
+    private String managerName;
+
     public CreateUserRequest() {}
 
     public String getUsername() { return username; }
@@ -44,4 +48,10 @@ public class CreateUserRequest {
 
     public String getDepartment() { return department; }
     public void setDepartment(String department) { this.department = department; }
+
+    public Long getManagerId() { return managerId; }
+    public void setManagerId(Long managerId) { this.managerId = managerId; }
+
+    public String getManagerName() { return managerName; }
+    public void setManagerName(String managerName) { this.managerName = managerName; }
 }

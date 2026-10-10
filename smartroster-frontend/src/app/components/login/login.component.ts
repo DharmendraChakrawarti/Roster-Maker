@@ -1,9 +1,10 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
-import { CreateUserRequest } from '../../models/auth.models';
+import { DepartmentService } from '../../services/department.service';
+import { CreateUserRequest, ManagerSummary, Department } from '../../models/auth.models';
 
 @Component({
   selector: 'app-login',
@@ -12,42 +13,45 @@ import { CreateUserRequest } from '../../models/auth.models';
   template: `
     <div class="login-wrapper">
       <div class="login-glow-bg"></div>
+      <div class="login-glow-bg-secondary"></div>
 
       <div class="login-container">
         <!-- Brand Header -->
         <div class="brand-header">
           <div class="brand-icon-box">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
               <polyline points="2 17 12 22 22 17"></polyline>
               <polyline points="2 12 12 17 22 12"></polyline>
             </svg>
           </div>
           <h1 class="brand-title">SmartRoster</h1>
-          <p class="brand-subtitle">Enterprise Workforce & Shift Operations</p>
+          <p class="brand-subtitle">Shift & Workforce Management Portal</p>
         </div>
 
         <!-- Auth Card -->
         <div class="card auth-card">
-          <!-- Tab Switcher -->
+          <!-- Segmented Tab Switcher -->
           <div class="auth-tabs">
             <button
+              type="button"
               class="auth-tab-btn"
               [class.active]="activeTab === 'login'"
-              (click)="activeTab = 'login'; clearMessages()">
+              (click)="setTab('login')">
               Sign In
             </button>
             <button
+              type="button"
               class="auth-tab-btn"
               [class.active]="activeTab === 'register'"
-              (click)="activeTab = 'register'; clearMessages()">
+              (click)="setTab('register')">
               Create Account
             </button>
           </div>
 
           <!-- Alert Messages -->
           <div *ngIf="errorMessage" class="alert alert-danger mt-3">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10"></circle>
               <line x1="12" y1="8" x2="12" y2="12"></line>
               <line x1="12" y1="16" x2="12.01" y2="16"></line>
@@ -56,7 +60,7 @@ import { CreateUserRequest } from '../../models/auth.models';
           </div>
 
           <div *ngIf="successMessage" class="alert alert-success mt-3">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
             <span>{{ successMessage }}</span>
@@ -74,7 +78,7 @@ import { CreateUserRequest } from '../../models/auth.models';
                 <input
                   type="text"
                   class="form-control with-icon"
-                  placeholder="e.g. dc or dc@smartroster.io"
+                  placeholder="Enter username or email"
                   [(ngModel)]="loginUsername"
                   name="username"
                   required
@@ -92,8 +96,8 @@ import { CreateUserRequest } from '../../models/auth.models';
                 </svg>
                 <input
                   [type]="showPassword ? 'text' : 'password'"
-                  class="form-control with-icon"
-                  placeholder="Enter your password"
+                  class="form-control with-icon with-action"
+                  placeholder="Enter password"
                   [(ngModel)]="loginPassword"
                   name="password"
                   required
@@ -103,7 +107,8 @@ import { CreateUserRequest } from '../../models/auth.models';
                   type="button"
                   class="toggle-pw-btn"
                   (click)="showPassword = !showPassword"
-                  tabindex="-1">
+                  tabindex="-1"
+                  [title]="showPassword ? 'Hide password' : 'Show password'">
                   <svg *ngIf="!showPassword" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                     <circle cx="12" cy="12" r="3"></circle>
@@ -124,101 +129,160 @@ import { CreateUserRequest } from '../../models/auth.models';
 
           <!-- REGISTER FORM -->
           <form *ngIf="activeTab === 'register'" (ngSubmit)="onRegister()" class="auth-form mt-3">
+            <!-- Simple Manager and Staff Buttons -->
+            <div class="form-group mb-2">
+              <label class="form-label">Select Account Role</label>
+              <div class="role-segmented-group">
+                <button
+                  type="button"
+                  class="role-btn"
+                  [class.active]="selectedRole === 'MANAGER'"
+                  (click)="setRole('MANAGER')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                    <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                  </svg>
+                  <span>Manager</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="role-btn"
+                  [class.active]="selectedRole === 'USER'"
+                  (click)="setRole('USER')">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                  </svg>
+                  <span>Staff</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Reporting Manager Dropdown (Only for Staff accounts) -->
+            <div *ngIf="selectedRole === 'USER'" class="form-group staff-manager-field">
+              <label class="form-label">
+                Reporting Manager <span class="required-star">*</span>
+              </label>
+              <div class="input-wrapper">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                </svg>
+                <select
+                  class="form-control with-icon"
+                  [(ngModel)]="registerData.managerId"
+                  name="regManagerId"
+                  required
+                  [disabled]="loading || managers.length === 0">
+                  <option [ngValue]="undefined" disabled>Choose your reporting manager</option>
+                  <option *ngFor="let m of managers" [ngValue]="m.id">
+                    {{ m.fullName }} (&#64;{{ m.username }}) — {{ m.department || 'Operations' }}
+                  </option>
+                </select>
+              </div>
+              <p *ngIf="managers.length === 0" class="field-warn">No managers found. Default manager will be assigned.</p>
+            </div>
+
             <div class="form-group">
               <label class="form-label">Full Name</label>
-              <input
-                type="text"
-                class="form-control"
-                placeholder="e.g. John Doe"
-                [(ngModel)]="registerData.fullName"
-                name="regFullName"
-                required
-                [disabled]="loading" />
+              <div class="input-wrapper">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="12" cy="7" r="4"></circle>
+                </svg>
+                <input
+                  type="text"
+                  class="form-control with-icon"
+                  placeholder="Enter your full name"
+                  [(ngModel)]="registerData.fullName"
+                  name="regFullName"
+                  required
+                  [disabled]="loading" />
+              </div>
             </div>
 
             <div class="form-group">
               <label class="form-label">Username</label>
-              <input
-                type="text"
-                class="form-control"
-                placeholder="e.g. jdoe"
-                [(ngModel)]="registerData.username"
-                name="regUsername"
-                required
-                [disabled]="loading" />
+              <div class="input-wrapper">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="4"></circle>
+                  <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-3.92 7.94"></path>
+                </svg>
+                <input
+                  type="text"
+                  class="form-control with-icon"
+                  placeholder="Choose a unique username"
+                  [(ngModel)]="registerData.username"
+                  name="regUsername"
+                  required
+                  [disabled]="loading" />
+              </div>
             </div>
 
             <div class="form-group">
               <label class="form-label">Email Address</label>
-              <input
-                type="email"
-                class="form-control"
-                placeholder="e.g. jdoe@smartroster.io"
-                [(ngModel)]="registerData.email"
-                name="regEmail"
-                required
-                [disabled]="loading" />
+              <div class="input-wrapper">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                  <polyline points="22,6 12,13 2,6"></polyline>
+                </svg>
+                <input
+                  type="email"
+                  class="form-control with-icon"
+                  placeholder="name@company.com"
+                  [(ngModel)]="registerData.email"
+                  name="regEmail"
+                  required
+                  [disabled]="loading" />
+              </div>
             </div>
 
             <div class="form-group">
               <label class="form-label">Department</label>
-              <select class="form-control" [(ngModel)]="registerData.department" name="regDept" [disabled]="loading">
-                <option value="Operations">Operations</option>
-                <option value="Engineering & Management">Engineering & Management</option>
-                <option value="IT & Security">IT & Security</option>
-                <option value="Customer Support">Customer Support</option>
-                <option value="Logistics">Logistics</option>
-              </select>
+              <div class="input-wrapper">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
+                  <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
+                </svg>
+                <select class="form-control with-icon" [(ngModel)]="registerData.department" name="regDept" [disabled]="loading" required>
+                  <option value="" disabled>Select department</option>
+                  <option *ngFor="let d of departments" [value]="d.name">{{ d.name }}</option>
+                </select>
+              </div>
             </div>
 
             <div class="form-group">
               <label class="form-label">Password</label>
-              <input
-                type="password"
-                class="form-control"
-                placeholder="Minimum 6 characters"
-                [(ngModel)]="registerData.password"
-                name="regPassword"
-                required
-                minlength="6"
-                [disabled]="loading" />
+              <div class="input-wrapper">
+                <svg class="input-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <input
+                  type="password"
+                  class="form-control with-icon"
+                  placeholder="Minimum 6 characters"
+                  [(ngModel)]="registerData.password"
+                  name="regPassword"
+                  required
+                  minlength="6"
+                  [disabled]="loading" />
+              </div>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-block submit-btn" [disabled]="loading || !registerData.username || !registerData.email || !registerData.password || !registerData.fullName">
-              <span *ngIf="!loading">Create Account</span>
+            <button
+              type="submit"
+              class="btn btn-primary btn-block submit-btn"
+              [disabled]="loading || !registerData.username || !registerData.email || !registerData.password || !registerData.fullName || (selectedRole === 'USER' && managers.length > 0 && !registerData.managerId)">
+              <span *ngIf="!loading">Create {{ selectedRole === 'MANAGER' ? 'Manager' : 'Staff' }} Account</span>
               <span *ngIf="loading">Creating Account...</span>
             </button>
           </form>
-
-          <!-- Quick 1-Click Demo Login Panel -->
-          <div class="demo-logins-section">
-            <div class="demo-divider">
-              <span>Quick 1-Click Demo Access</span>
-            </div>
-            <div class="demo-cards-grid">
-              <button class="demo-card demo-admin" (click)="quickLogin('dc', 'dc123')">
-                <div class="demo-role-badge badge-admin">Admin</div>
-                <div class="demo-user-name">DC (Creator)</div>
-                <div class="demo-creds">dc / dc123</div>
-              </button>
-
-              <button class="demo-card demo-manager" (click)="quickLogin('manager', 'manager123')">
-                <div class="demo-role-badge badge-manager">Manager</div>
-                <div class="demo-user-name">Shift Lead</div>
-                <div class="demo-creds">manager / manager123</div>
-              </button>
-
-              <button class="demo-card demo-user" (click)="quickLogin('rahul', 'user123')">
-                <div class="demo-role-badge badge-staff">Staff</div>
-                <div class="demo-user-name">Rahul Sharma</div>
-                <div class="demo-creds">rahul / user123</div>
-              </button>
-            </div>
-          </div>
         </div>
 
         <div class="login-footer">
-          <span>Created by DC</span>
+          <span>SmartRoster • by DC</span>
         </div>
       </div>
     </div>
@@ -229,22 +293,35 @@ import { CreateUserRequest } from '../../models/auth.models';
       display: flex;
       align-items: center;
       justify-content: center;
-      background: var(--bg-primary);
-      padding: 1.5rem;
+      background: radial-gradient(circle at top, #14161f 0%, #0c0d12 100%);
+      padding: 1.5rem 1rem;
       position: relative;
       overflow: hidden;
     }
 
     .login-glow-bg {
       position: absolute;
-      width: 600px;
-      height: 600px;
+      width: 550px;
+      height: 550px;
       border-radius: 50%;
-      background: radial-gradient(circle, rgba(26, 115, 232, 0.12) 0%, rgba(15, 16, 20, 0) 70%);
-      top: 50%;
+      background: radial-gradient(circle, rgba(26, 115, 232, 0.15) 0%, rgba(15, 16, 20, 0) 70%);
+      top: 30%;
       left: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
+      filter: blur(40px);
+    }
+
+    .login-glow-bg-secondary {
+      position: absolute;
+      width: 350px;
+      height: 350px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(138, 180, 248, 0.08) 0%, rgba(15, 16, 20, 0) 70%);
+      bottom: 10%;
+      right: 20%;
+      pointer-events: none;
+      filter: blur(50px);
     }
 
     .login-container {
@@ -256,91 +333,194 @@ import { CreateUserRequest } from '../../models/auth.models';
 
     .brand-header {
       text-align: center;
-      margin-bottom: 1.75rem;
+      margin-bottom: 1.5rem;
     }
 
     .brand-icon-box {
-      width: 52px;
-      height: 52px;
+      width: 54px;
+      height: 54px;
       border-radius: 14px;
-      background: linear-gradient(135deg, var(--accent-primary) 0%, #1558b0 100%);
+      background: linear-gradient(135deg, #1a73e8 0%, #1255aa 100%);
       color: #fff;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 8px 24px rgba(26, 115, 232, 0.35);
-      margin-bottom: 0.75rem;
+      box-shadow: 0 10px 25px rgba(26, 115, 232, 0.4);
+      margin-bottom: 0.85rem;
+      border: 1px solid rgba(255, 255, 255, 0.15);
     }
 
     .brand-title {
-      font-size: 1.75rem;
-      font-weight: 800;
+      font-size: 1.85rem;
+      font-weight: 900;
       letter-spacing: -0.5px;
       color: var(--text-heading);
       margin: 0;
     }
 
     .brand-subtitle {
-      font-size: 0.85rem;
+      font-size: 0.95rem;
       color: var(--text-secondary);
-      margin-top: 4px;
+      margin-top: 5px;
+      letter-spacing: 0.2px;
     }
 
     .auth-card {
-      padding: 1.75rem 2rem;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
+      padding: 2rem 1.75rem 2.25rem 1.75rem;
+      background: rgba(24, 25, 32, 0.88);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.06);
       border: 1px solid var(--border-color);
+      border-radius: var(--radius-xl);
+      width: 100%;
+      box-sizing: border-box;
     }
 
+    /* Tabs */
     .auth-tabs {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      background: var(--bg-secondary);
-      padding: 4px;
-      border-radius: var(--radius-sm);
+      background: rgba(15, 16, 22, 0.8);
+      padding: 5px;
+      border-radius: var(--radius-md);
       border: 1px solid var(--border-color);
+      gap: 6px;
     }
 
     .auth-tab-btn {
       background: none;
       border: none;
       color: var(--text-secondary);
-      font-weight: 600;
-      font-size: 0.85rem;
-      padding: 8px 12px;
-      border-radius: 4px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 11px 14px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
       transition: all var(--transition-fast);
+      text-align: center;
+      min-height: 44px;
+    }
+
+    .auth-tab-btn:hover {
+      color: var(--text-primary);
     }
 
     .auth-tab-btn.active {
-      background: var(--bg-card);
-      color: var(--text-heading);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+      background: var(--accent-primary);
+      color: #fff;
+      box-shadow: 0 2px 10px rgba(26, 115, 232, 0.35);
     }
 
     .auth-form {
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 1.25rem;
+      width: 100%;
+    }
+
+    /* Simple Role Button Controls */
+    .role-segmented-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 6px;
+      width: 100%;
+    }
+
+    .role-btn {
+      background: var(--bg-input);
+      border: 1.5px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 12px 16px;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all var(--transition-fast);
+      min-height: 48px;
+      width: 100%;
+    }
+
+    .role-btn:hover {
+      border-color: var(--border-hover);
+      color: var(--text-primary);
+      background: var(--bg-card-hover);
+    }
+
+    .role-btn.active {
+      background: rgba(26, 115, 232, 0.18);
+      border-color: var(--accent-primary);
+      color: #fff;
+      box-shadow: 0 0 12px rgba(26, 115, 232, 0.25);
+    }
+
+    .role-btn.active svg {
+      stroke: var(--accent-primary-light);
+    }
+
+    /* Form Fields */
+    .form-group {
+      margin-bottom: 0;
+      width: 100%;
+    }
+
+    .form-label {
+      font-size: 0.85rem;
+      font-weight: 800;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 7px;
+      display: block;
+    }
+
+    .required-star {
+      color: var(--accent-danger);
     }
 
     .input-wrapper {
       position: relative;
       display: flex;
       align-items: center;
+      width: 100%;
     }
 
     .input-icon {
       position: absolute;
-      left: 12px;
+      left: 14px;
       color: var(--text-muted);
       pointer-events: none;
+      transition: color var(--transition-fast);
     }
 
     .form-control.with-icon {
-      padding-left: 38px;
-      padding-right: 38px;
+      padding-left: 44px;
+      padding-right: 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      font-size: 1rem;
+      min-height: 48px;
+      color: var(--text-primary);
+      width: 100%;
+    }
+
+    .form-control.with-action {
+      padding-right: 44px;
+    }
+
+    .form-control:focus {
+      border-color: var(--accent-primary);
+      box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.25);
+      background: #15161f;
+    }
+
+    .input-wrapper:focus-within .input-icon {
+      color: var(--accent-primary-light);
     }
 
     .toggle-pw-btn {
@@ -352,7 +532,9 @@ import { CreateUserRequest } from '../../models/auth.models';
       cursor: pointer;
       display: flex;
       align-items: center;
-      padding: 4px;
+      justify-content: center;
+      padding: 8px;
+      border-radius: 4px;
       transition: color var(--transition-fast);
     }
 
@@ -360,109 +542,103 @@ import { CreateUserRequest } from '../../models/auth.models';
       color: var(--text-primary);
     }
 
+    .field-warn {
+      font-size: 0.82rem;
+      color: var(--accent-warning);
+      margin-top: 5px;
+      margin-bottom: 0;
+    }
+
     .btn-block {
       width: 100%;
     }
 
     .submit-btn {
-      padding: 10px 16px;
-      font-weight: 600;
-      font-size: 0.9rem;
+      min-height: 50px;
+      font-weight: 800;
+      font-size: 1rem;
       margin-top: 0.5rem;
-    }
-
-    /* Demo Quick Logins */
-    .demo-logins-section {
-      margin-top: 1.75rem;
-      padding-top: 1.25rem;
-      border-top: 1px solid var(--border-color);
-    }
-
-    .demo-divider {
-      text-align: center;
-      margin-bottom: 0.85rem;
-    }
-
-    .demo-divider span {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: var(--text-muted);
-      text-transform: uppercase;
+      border-radius: var(--radius-md);
       letter-spacing: 0.5px;
-    }
-
-    .demo-cards-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-
-    .demo-card {
-      background: var(--bg-secondary);
-      border: 1px solid var(--border-color);
-      border-radius: var(--radius-sm);
-      padding: 8px 6px;
-      text-align: center;
-      cursor: pointer;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      transition: all var(--transition-fast);
-    }
-
-    .demo-card:hover {
-      border-color: var(--accent-primary);
-      background: var(--bg-card-hover);
-      transform: translateY(-2px);
-    }
-
-    .demo-role-badge {
-      font-size: 0.65rem;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 8px;
-      text-transform: uppercase;
-    }
-
-    .badge-admin {
-      background: rgba(26, 115, 232, 0.2);
-      color: var(--accent-primary-light);
-    }
-
-    .badge-manager {
-      background: rgba(249, 171, 0, 0.2);
-      color: var(--accent-warning);
-    }
-
-    .badge-staff {
-      background: rgba(52, 168, 83, 0.2);
-      color: var(--accent-success-light);
-    }
-
-    .demo-user-name {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-
-    .demo-creds {
-      font-size: 0.65rem;
-      color: var(--text-muted);
-      font-family: monospace;
     }
 
     .login-footer {
       text-align: center;
       margin-top: 1.5rem;
-      font-size: 0.75rem;
+      font-size: 0.85rem;
       color: var(--text-muted);
-      text-transform: uppercase;
       letter-spacing: 0.5px;
+    }
+
+    @media (max-width: 600px) {
+      .login-wrapper {
+        padding: 1.25rem 0.75rem !important;
+        width: 100vw !important;
+        overflow-x: hidden !important;
+      }
+
+      .login-container {
+        width: 100% !important;
+        max-width: 100% !important;
+      }
+
+      .brand-title {
+        font-size: 1.75rem !important;
+        font-weight: 900;
+      }
+
+      .brand-subtitle {
+        font-size: 0.95rem !important;
+      }
+
+      .auth-card {
+        padding: 1.5rem 1.15rem !important;
+        border-radius: var(--radius-lg) !important;
+      }
+
+      .auth-tab-btn {
+        font-size: 1rem !important;
+        font-weight: 800 !important;
+        padding: 12px 14px !important;
+        min-height: 48px;
+      }
+
+      .role-segmented-group {
+        gap: 8px;
+      }
+
+      .role-btn {
+        font-size: 1rem !important;
+        font-weight: 800 !important;
+        padding: 12px 14px !important;
+        min-height: 48px;
+      }
+
+      .form-label {
+        font-size: 0.88rem !important;
+        font-weight: 800 !important;
+        margin-bottom: 6px;
+      }
+
+      .form-control {
+        font-size: 1rem !important;
+        min-height: 48px;
+      }
+
+      .submit-btn {
+        min-height: 50px !important;
+        font-size: 1rem !important;
+        font-weight: 900 !important;
+        letter-spacing: 0.5px;
+      }
+
+      .login-footer {
+        font-size: 0.85rem !important;
+      }
     }
   `]
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   activeTab: 'login' | 'register' = 'login';
   loading = false;
   errorMessage = '';
@@ -472,18 +648,76 @@ export class LoginComponent {
   loginUsername = '';
   loginPassword = '';
 
+  selectedRole: 'MANAGER' | 'USER' = 'MANAGER';
+  managers: ManagerSummary[] = [];
+  departments: Department[] = [];
+
   registerData: CreateUserRequest = {
     username: '',
     email: '',
     password: '',
     fullName: '',
-    department: 'Operations',
-    role: 'USER'
+    department: '',
+    role: 'MANAGER',
+    managerId: undefined
   };
 
-  constructor(private authService: AuthService, private router: Router) {
+  constructor(
+    private authService: AuthService,
+    private deptService: DepartmentService,
+    private router: Router
+  ) {
     if (this.authService.isLoggedIn) {
-      this.router.navigate(['/dashboard']);
+      if (this.authService.isStaff) {
+        this.router.navigate(['/roster']);
+      } else if (this.authService.isAdmin) {
+        this.router.navigate(['/admin']);
+      } else {
+        this.router.navigate(['/dashboard']);
+      }
+    }
+  }
+
+  ngOnInit(): void {
+    this.loadManagers();
+    this.loadDepartments();
+  }
+
+  loadDepartments(): void {
+    this.deptService.getDepartments().subscribe({
+      next: (depts) => {
+        this.departments = depts;
+        if (!this.registerData.department && this.departments.length > 0) {
+          this.registerData.department = this.departments[0].name;
+        }
+      },
+      error: () => { }
+    });
+  }
+
+  loadManagers(): void {
+    this.authService.getManagers().subscribe({
+      next: (mgrs) => {
+        this.managers = mgrs;
+      },
+      error: () => { }
+    });
+  }
+
+  setTab(tab: 'login' | 'register'): void {
+    this.activeTab = tab;
+    this.clearMessages();
+    if (tab === 'register') {
+      this.loadManagers();
+      this.loadDepartments();
+    }
+  }
+
+  setRole(role: 'MANAGER' | 'USER'): void {
+    this.selectedRole = role;
+    this.registerData.role = role;
+    if (role === 'MANAGER') {
+      this.registerData.managerId = undefined;
     }
   }
 
@@ -502,6 +736,8 @@ export class LoginComponent {
         this.loading = false;
         if (res.user.role === 'ADMIN') {
           this.router.navigate(['/admin']);
+        } else if (res.user.role === 'USER') {
+          this.router.navigate(['/roster']);
         } else {
           this.router.navigate(['/dashboard']);
         }
@@ -514,25 +750,30 @@ export class LoginComponent {
   }
 
   onRegister(): void {
+    if (!this.registerData.department && this.departments.length > 0) {
+      this.registerData.department = this.departments[0].name;
+    }
     this.loading = true;
     this.clearMessages();
 
+    this.registerData.role = this.selectedRole;
+
     this.authService.register(this.registerData).subscribe({
-      next: () => {
+      next: (res) => {
         this.loading = false;
         this.successMessage = 'Account created successfully! Redirecting...';
-        setTimeout(() => this.router.navigate(['/dashboard']), 1000);
+        setTimeout(() => {
+          if (res.user.role === 'USER') {
+            this.router.navigate(['/roster']);
+          } else {
+            this.router.navigate(['/dashboard']);
+          }
+        }, 1000);
       },
       error: (err) => {
         this.loading = false;
         this.errorMessage = err.error?.message || err.message || 'Failed to create account.';
       }
     });
-  }
-
-  quickLogin(username: string, pass: string): void {
-    this.loginUsername = username;
-    this.loginPassword = pass;
-    this.onLogin();
   }
 }

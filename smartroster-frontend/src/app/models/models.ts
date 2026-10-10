@@ -2,6 +2,8 @@ export interface Employee {
   id?: number;
   name: string;
   active?: boolean;
+  managerId?: number;
+  managerName?: string;
 }
 
 export interface ShiftConfig {
@@ -18,6 +20,7 @@ export interface GenerateRosterRequest {
   month: number;
   year: number;
   weeklyOffPerEmployee?: number;
+  managerId?: number;
 }
 
 export interface RosterAssignment {
@@ -44,6 +47,8 @@ export interface Roster {
   year: number;
   status: string;
   weeklyOffPerEmployee: number;
+  managerId?: number;
+  managerName?: string;
   assignments?: RosterAssignment[];
   warnings?: string[];
   employeeSummary?: { [key: string]: EmployeeShiftSummary };

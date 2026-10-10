@@ -628,6 +628,148 @@ import { ShiftConfig, Employee } from '../../models/models';
       padding-top: 1rem;
       border-top: 1px solid var(--border-color);
     }
+
+    @media (max-width: 900px) {
+      .calc-metrics-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .calculator-card {
+        padding: 1.25rem 1rem !important;
+      }
+
+      .calc-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+      }
+
+      .calc-title {
+        font-size: 1.25rem !important;
+        font-weight: 800;
+      }
+
+      .calc-description {
+        font-size: 0.95rem !important;
+        line-height: 1.55;
+      }
+
+      .calc-metrics-grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.85rem !important;
+      }
+
+      .calc-metric {
+        padding: 1.15rem !important;
+      }
+
+      .calc-lbl {
+        font-size: 0.82rem !important;
+        font-weight: 800 !important;
+      }
+
+      .calc-val {
+        font-size: 1.85rem !important;
+        font-weight: 900 !important;
+      }
+
+      .calc-sub {
+        font-size: 0.82rem !important;
+      }
+
+      .calc-advice {
+        padding: 1.15rem !important;
+      }
+
+      .advice-content strong {
+        font-size: 1.05rem !important;
+      }
+
+      .advice-content p {
+        font-size: 0.95rem !important;
+        line-height: 1.55;
+      }
+
+      .rec-title {
+        font-size: 0.88rem !important;
+        font-weight: 800;
+      }
+
+      .recommended-box .rec-values {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+        font-size: 0.95rem !important;
+      }
+
+      .shift-grid {
+        grid-template-columns: 1fr !important;
+        gap: 1rem !important;
+      }
+
+      .shift-card {
+        padding-bottom: 0.5rem;
+      }
+
+      .shift-header {
+        padding: 1.25rem 1rem 0.85rem;
+      }
+
+      .shift-header h3 {
+        font-size: 1.25rem !important;
+        font-weight: 800;
+      }
+
+      .icon-btn {
+        width: 38px;
+        height: 38px;
+      }
+
+      .icon-btn svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .staffing-row {
+        gap: 0.65rem;
+      }
+
+      .staffing-item {
+        padding: 1rem;
+      }
+
+      .staffing-label {
+        font-size: 0.8rem !important;
+        font-weight: 700;
+      }
+
+      .staffing-value {
+        font-size: 1.45rem !important;
+        font-weight: 900;
+      }
+
+      .grid-2 {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem;
+      }
+
+      .form-hint {
+        font-size: 0.82rem !important;
+      }
+
+      .color-picker-row {
+        flex-wrap: wrap;
+      }
+
+      .color-preview {
+        width: 100%;
+        text-align: center;
+        padding: 10px 14px;
+        font-size: 0.9rem !important;
+      }
+    }
   `]
 })
 export class ShiftConfigComponent implements OnInit {

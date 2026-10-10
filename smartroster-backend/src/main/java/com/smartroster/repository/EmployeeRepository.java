@@ -8,6 +8,13 @@ import java.util.List;
 @Repository
 public interface EmployeeRepository extends JpaRepository<Employee, Long> {
     List<Employee> findByActiveTrueOrderByNameAsc();
+    List<Employee> findByManagerIdAndActiveTrueOrderByNameAsc(Long managerId);
+    List<Employee> findByManagerIdOrderByNameAsc(Long managerId);
+    List<Employee> findByManagerIdIsNullAndActiveTrueOrderByNameAsc();
+    List<Employee> findAllByOrderByNameAsc();
     boolean existsByNameIgnoreCase(String name);
+    boolean existsByNameIgnoreCaseAndManagerId(String name, Long managerId);
     long countByActiveTrue();
+    long countByManagerIdAndActiveTrue(Long managerId);
+    long countByManagerId(Long managerId);
 }
